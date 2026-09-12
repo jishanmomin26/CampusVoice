@@ -84,37 +84,132 @@ ml/
 ├── datasets/
 │   ├── finalDataset0.2.xlsx      # Original raw dataset (UNTOUCHED)
 │   ├── processed_feedback.csv    # Standardized long-format dataset
-│   ├── train_feedback.csv        # 80% stratified training split
-│   ├── test_feedback.csv         # 20% stratified testing split
+│   ├── train_feedback.csv        # 80% stratified training split (578 samples)
+│   ├── test_feedback.csv         # 20% stratified testing split (145 samples)
 │   └── dataset_summary.json      # Complete dataset audit and metrics
+├── evaluation/
+│   ├── evaluate_models.py        # Evaluation metrics & best model selection
+│   ├── model_comparison.json     # Quantitative test evaluation metrics
+│   └── confusion_matrix.json     # 3x3 confusion matrices & breakdowns
 ├── models/
-│   └── tfidf_vectorizer.joblib   # Fitted scikit-learn TF-IDF vectorizer artifact
+│   ├── tfidf_vectorizer.joblib   # Fitted TF-IDF vectorizer (Step 4)
+│   ├── logistic_regression_sentiment.joblib # Trained Logistic Regression
+│   ├── naive_bayes_sentiment.joblib         # Trained MultinomialNB
+│   ├── best_sentiment_model.joblib          # Selected best model (Macro F1)
+│   ├── model_metadata.json       # Training metadata & per-class metrics
+│   └── inference.py              # Real-time sentiment prediction utility
 ├── preprocessing/
 │   ├── inspect_dataset.py        # Workbook inspection utility
 │   ├── dataset_preparation.py    # Wide-to-long transformation & NLP pipeline
 │   └── tfidf_features.py         # TF-IDF feature engineering module
 ├── tests/
-│   └── test_dataset_preparation.py # Automated pytest suite
+│   ├── test_dataset_preparation.py # Automated test suite for Step 4
+│   └── test_model_training.py      # Automated test suite for Step 5
+├── training/
+│   ├── train_models.py           # Model training functions
+│   └── train_and_evaluate.py     # Master execution script for Step 5
 ├── run_pipeline.py               # Master execution script for Step 4
 └── README.md
 ```
 
 ---
 
-## 6. How to Run
+## 6. Step 5 — Baseline Sentiment Classification Models
 
-### 1. Run Dataset Inspection
-```powershell
-# From project root with venv activated:
-python ml/preprocessing/inspect_dataset.py
+### Candidate Models & Configurations
+
+1. **Logistic Regression**
+   * Class: `sklearn.linear_model.LogisticRegression`
+   * Configuration: `max_iter=2000`, `random_state=42`, `class_weight='balanced'`
+   * Rationale: Handles class imbalance across positive (majority), negative, and neutral classes with L2 regularization.
+
+2. **Multinomial Naive Bayes**
+   * Class: `sklearn.naive_bayes.MultinomialNB`
+   * Configuration: `alpha=1.0` (Laplace smoothing)
+   * Rationale: Classical probabilistic text baseline using discrete TF-IDF term counts.
+
+### Evaluation & Model Selection Results (Held-Out Test Set)
+
+Evaluated strictly on the held-out test set ($N = 145$ samples) using the Step 4 fitted TF-IDF vectorizer (2,720 features). **Selection Metric: Macro F1**.
+
+| Metric | Logistic Regression (Balanced) | Multinomial Naive Bayes |
+| :--- | :---: | :---: |
+| **Accuracy** | **0.7241 (72.41%)** | 0.6552 (65.52%) |
+| **Precision (Macro)** | 0.6201 | **0.8158** |
+| **Recall (Macro)** | **0.6238** | 0.3933 |
+| **F1-Score (Macro)** | **0.6217** *(Selected Best)* | 0.3666 |
+| **Precision (Weighted)** | 0.7305 | 0.7426 |
+| **Recall (Weighted)** | **0.7241** | 0.6552 |
+| **F1-Score (Weighted)** | **0.7271** | 0.5480 |
+
+### Per-Class Performance (Logistic Regression — Best Model)
+
+| Class | Label | Precision | Recall | F1-Score | Support |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Negative** | `-1` | 0.5714 | 0.5714 | 0.5714 | 28 |
+| **Neutral** | `0` | 0.4138 | 0.4444 | 0.4286 | 27 |
+| **Positive** | `1` | 0.8750 | 0.8556 | 0.8652 | 90 |
+| **Macro Average** | — | **0.6201** | **0.6238** | **0.6217** | 145 |
+| **Weighted Average** | — | **0.7305** | **0.7241** | **0.7271** | 145 |
+
+### Confusion Matrices
+
+#### Logistic Regression
+```text
+                 Pred Negative | Pred Neutral | Pred Positive
+Actual Negative:      16       | 10           | 2
+Actual Neutral:       6        | 12           | 9
+Actual Positive:      6        | 7            | 77
 ```
 
-### 2. Execute Full Step 4 Pipeline
-```powershell
-python ml/run_pipeline.py
+#### Multinomial Naive Bayes
+```text
+                 Pred Negative | Pred Neutral | Pred Positive
+Actual Negative:      4        | 0            | 24
+Actual Neutral:       1        | 1            | 25
+Actual Positive:      0        | 0            | 90
 ```
 
-### 3. Run Automated Tests
+*Observation*: MultinomialNB suffered from severe majority-class collapse towards the positive class (90/90 positive recall, but almost completely failing to detect negative and neutral comments). Logistic Regression with balanced class weights significantly outperformed it by correctly identifying 16/28 negative and 12/27 neutral feedbacks.
+
+---
+
+## 7. Sentiment Inference Utility
+
+Use `ml.models.inference.predict_sentiment`:
+
+```python
+from ml.models.inference import predict_sentiment
+
+# Predict using best model (default)
+result = predict_sentiment("The faculty is not helpful and rude.")
+print(result)
+# Output:
+# {
+#   'text': 'The faculty is not helpful and rude.',
+#   'clean_text': 'faculty not helpful rude',
+#   'sentiment': -1,
+#   'sentiment_label': 'negative',
+#   'model_used': 'best',
+#   'probabilities': {'negative': 0.658, 'neutral': 0.231, 'positive': 0.111},
+#   'confidence': 0.658
+# }
+
+# Explicit model selection: 'logistic_regression' or 'naive_bayes'
+result = predict_sentiment("Great library collection!", model_name="naive_bayes")
+```
+
+---
+
+## 8. How to Run
+
+### 1. Run Step 5 Model Training & Evaluation
+```powershell
+python ml/training/train_and_evaluate.py
+```
+
+### 2. Run All Automated Tests
 ```powershell
 pytest ml/tests/ -v
+pytest backend/tests/ -v
 ```

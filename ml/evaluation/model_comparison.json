@@ -1,0 +1,21 @@
+{
+  "selected_metric": "f1_macro",
+  "best_model": "logistic_regression",
+  "best_macro_f1": 0.6217228464419476,
+  "models": {
+    "logistic_regression": {
+      "accuracy": 0.7241379310344828,
+      "f1_macro": 0.6217228464419476,
+      "f1_weighted": 0.7271489455914097,
+      "precision_macro": 0.6200738916256158,
+      "recall_macro": 0.6238095238095238
+    },
+    "multinomial_nb": {
+      "accuracy": 0.6551724137931034,
+      "f1_macro": 0.36662633824205876,
+      "f1_weighted": 0.547991781345192,
+      "precision_macro": 0.8158273381294965,
+      "recall_macro": 0.39329805996472667
+    }
+  }
+}

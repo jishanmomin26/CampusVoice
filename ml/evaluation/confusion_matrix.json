@@ -1,0 +1,94 @@
+{
+  "logistic_regression": {
+    "labels": [
+      -1,
+      0,
+      1
+    ],
+    "class_names": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "matrix": [
+      [
+        16,
+        10,
+        2
+      ],
+      [
+        6,
+        12,
+        9
+      ],
+      [
+        6,
+        7,
+        77
+      ]
+    ],
+    "breakdown": {
+      "actual_negative": {
+        "pred_negative": 16,
+        "pred_neutral": 10,
+        "pred_positive": 2
+      },
+      "actual_neutral": {
+        "pred_negative": 6,
+        "pred_neutral": 12,
+        "pred_positive": 9
+      },
+      "actual_positive": {
+        "pred_negative": 6,
+        "pred_neutral": 7,
+        "pred_positive": 77
+      }
+    }
+  },
+  "multinomial_nb": {
+    "labels": [
+      -1,
+      0,
+      1
+    ],
+    "class_names": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "matrix": [
+      [
+        4,
+        0,
+        24
+      ],
+      [
+        1,
+        1,
+        25
+      ],
+      [
+        0,
+        0,
+        90
+      ]
+    ],
+    "breakdown": {
+      "actual_negative": {
+        "pred_negative": 4,
+        "pred_neutral": 0,
+        "pred_positive": 24
+      },
+      "actual_neutral": {
+        "pred_negative": 1,
+        "pred_neutral": 1,
+        "pred_positive": 25
+      },
+      "actual_positive": {
+        "pred_negative": 0,
+        "pred_neutral": 0,
+        "pred_positive": 90
+      }
+    }
+  }
+}
