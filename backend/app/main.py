@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.v1.endpoints import health, feedback
+from app.api.v1.endpoints import health, feedback, nlp
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -42,6 +42,13 @@ app.include_router(
     feedback.router,
     prefix=f"{settings.API_V1_STR}/feedback",
     tags=["Feedback"],
+)
+
+# Versioned NLP test endpoints: POST /api/v1/nlp/preprocess
+app.include_router(
+    nlp.router,
+    prefix=f"{settings.API_V1_STR}/nlp",
+    tags=["NLP"],
 )
 
 

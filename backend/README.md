@@ -5,18 +5,21 @@ FastAPI REST backend and PostgreSQL database foundation for the **CampusVoice** 
 ---
 
 ## 1. Backend Overview
-The backend provides the API service and database connectivity for ingesting and managing student feedback across campus departments and academic semesters. It uses:
+The backend provides the API service, database connectivity, and NLP preprocessing pipeline for ingesting, managing, and standardizing student feedback across campus departments and academic semesters.
+
 * **Framework**: FastAPI (Python 3.10+)
 * **Database**: PostgreSQL 18+
 * **ORM**: SQLAlchemy 2.x
 * **Driver**: psycopg (psycopg3)
 * **Migrations**: Alembic
 * **Data Validation**: Pydantic v2 & `pydantic-settings`
+* **NLP & Text Processing**: NLTK, spaCy (`en_core_web_sm`)
+* **Testing**: pytest, HTTPX
 
 ---
 
 ## 2. Prerequisites
-* **Python**: 3.10+ installed
+* **Python**: 3.10+ installed (tested on Python 3.13)
 * **PostgreSQL**: Version 18+ running on `localhost:5432` with a database named `campusvoice`.
 
 ---
@@ -43,7 +46,27 @@ pip install -r requirements.txt
 
 ---
 
-## 4. Environment Configuration (`.env`)
+## 4. NLP Resources & Model Setup
+
+The NLP pipeline requires specific NLTK corpora and the spaCy English language model. These are downloaded via controlled, explicit setup commands rather than network downloads during server startup:
+
+### Step A: Download NLTK Resources
+```powershell
+python -m app.nlp.resources --download
+```
+Downloads:
+* `punkt` & `punkt_tab` (tokenization)
+* `stopwords` (stopword lists)
+* `wordnet` & `omw-1.4` (lexical database)
+
+### Step B: Download spaCy English Model
+```powershell
+python -m spacy download en_core_web_sm
+```
+
+---
+
+## 5. Environment Configuration (`.env`)
 
 Copy `backend/.env.example` to `backend/.env` (or update `backend/.env`):
 ```powershell
@@ -63,12 +86,11 @@ FRONTEND_URL=http://localhost:5173
 
 ---
 
-## 5. Database Migrations (Alembic)
+## 6. Database Migrations (Alembic)
 
 Alembic manages all database schema changes. To apply the initial migration that creates the `feedback` table:
 
 ```powershell
-# Ensure your virtual environment is active and you are in the backend/ directory:
 alembic upgrade head
 ```
 
@@ -81,16 +103,22 @@ alembic upgrade head
   ```powershell
   alembic history
   ```
-* Rollback last migration (if needed):
-  ```powershell
-  alembic downgrade -1
-  ```
 
 ---
 
-## 6. Running FastAPI Server
+## 7. Running Unit Tests
 
-Start the FastAPI development server with auto-reload:
+Execute the automated test suite covering text normalization, tokenization, stopword filtering (with negation preservation), lemmatization, and API endpoints:
+
+```powershell
+pytest tests/ -v
+```
+
+---
+
+## 8. Running FastAPI Server
+
+Start the development server with auto-reload:
 
 ```powershell
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -98,7 +126,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
-## 7. Interactive Documentation (Swagger / OpenAPI)
+## 9. Interactive Documentation (Swagger / OpenAPI)
 
 Once the server is running, visit:
 * **Interactive Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
@@ -106,60 +134,42 @@ Once the server is running, visit:
 
 ---
 
-## 8. API Endpoints
+## 10. API Endpoints
 
 ### Health Check
 * `GET /health` or `GET /api/v1/health`
-  * Returns:
-    ```json
-    {
-      "status": "healthy",
-      "service": "CampusVoice API",
-      "version": "0.1.0"
-    }
-    ```
+  * Returns service operational status.
 
-### Feedback Ingestion
-* `POST /api/v1/feedback`
-  * Status: `201 Created`
-  * Request Body:
+### NLP Preprocessing Test Endpoint
+* `POST /api/v1/nlp/preprocess`
+  * **Request Body**:
     ```json
     {
-      "department": "Computer Science",
-      "semester": "Semester 6",
-      "feedback_text": "The computer network laboratory routers require updated firmware."
+      "text": "The practical sessions are very useful! The faculty explains concepts clearly, but the lab computers are sometimes slow."
     }
     ```
-  * Response Body:
+  * **Response Body**:
     ```json
     {
-      "id": 1,
-      "department": "Computer Science",
-      "semester": "Semester 6",
-      "feedback_text": "The computer network laboratory routers require updated firmware.",
-      "created_at": "2026-09-12T21:30:00+00:00"
+      "original_text": "The practical sessions are very useful! The faculty explains concepts clearly, but the lab computers are sometimes slow.",
+      "normalized_text": "the practical sessions are very useful! the faculty explains concepts clearly, but the lab computers are sometimes slow.",
+      "tokens": ["the", "practical", "sessions", "are", "very", "useful", "the", "faculty", "explains", "concepts", "clearly", "but", "the", "lab", "computers", "are", "sometimes", "slow"],
+      "filtered_tokens": ["practical", "sessions", "useful", "faculty", "explains", "concepts", "clearly", "lab", "computers", "sometimes", "slow"],
+      "lemmatized_tokens": ["practical", "session", "useful", "faculty", "explain", "concept", "clearly", "lab", "computer", "sometimes", "slow"],
+      "clean_text": "practical session useful faculty explain concept clearly lab computer sometimes slow"
     }
     ```
+  * **Sentiment Negation Preservation**: Negation words (`not`, `no`, `never`, `n't`) are strictly preserved to ensure downstream sentiment analysis models receive accurate contextual polarity:
+    * Input: `"The faculty is not helpful."`
+    * Clean Text: `"faculty not helpful"` (NOT `"faculty helpful"`).
 
-### Feedback Retrieval
-* `GET /api/v1/feedback`
-  * Status: `200 OK`
-  * Returns an array of stored feedback records ordered by newest first:
-    ```json
-    [
-      {
-        "id": 1,
-        "department": "Computer Science",
-        "semester": "Semester 6",
-        "feedback_text": "The computer network laboratory routers require updated firmware.",
-        "created_at": "2026-09-12T21:30:00+00:00"
-      }
-    ]
-    ```
+### Feedback Ingestion & Retrieval
+* `POST /api/v1/feedback`: Ingests and stores student feedback in PostgreSQL.
+* `GET /api/v1/feedback`: Retrieves stored feedback records ordered by newest first.
 
 ---
 
-## 9. Backend Project Structure
+## 11. Backend Project Structure
 
 ```text
 backend/
@@ -171,7 +181,8 @@ backend/
 │   │       └── endpoints/
 │   │           ├── __init__.py
 │   │           ├── health.py
-│   │           └── feedback.py
+│   │           ├── feedback.py
+│   │           └── nlp.py          # NLP test endpoint
 │   ├── core/
 │   │   ├── __init__.py
 │   │   └── config.py
@@ -182,11 +193,19 @@ backend/
 │   ├── models/
 │   │   ├── __init__.py
 │   │   └── feedback.py
+│   ├── nlp/                        # NLP processing module
+│   │   ├── __init__.py
+│   │   ├── preprocessing.py        # Normalization, tokenization, lemmatization
+│   │   └── resources.py            # NLTK & spaCy resource management
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   └── feedback.py
+│   │   ├── feedback.py
+│   │   └── nlp.py                  # Preprocessing request & result schemas
 │   ├── __init__.py
 │   └── main.py
+├── tests/
+│   ├── __init__.py
+│   └── test_nlp_preprocessing.py   # Pytest suite
 ├── alembic/
 │   ├── versions/
 │   │   └── 001_create_feedback_table.py
@@ -195,6 +214,6 @@ backend/
 ├── alembic.ini
 ├── requirements.txt
 ├── .env.example
-├── .env                  (local, gitignored)
+├── .env                            (local, gitignored)
 └── README.md
 ```
