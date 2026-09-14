@@ -5,13 +5,16 @@ React + Vite frontend for the **CampusVoice** Student Feedback Intelligence plat
 ---
 
 ## 1. Overview
-The frontend provides an interactive, responsive web interface for students to submit institutional feedback and receive immediate, transparent feedback intelligence powered by the FastAPI backend and unified NLP/ML pipeline.
+The frontend provides an interactive, responsive web interface for students to submit institutional feedback and receive immediate, transparent feedback intelligence powered by the FastAPI backend, unified NLP/ML pipeline, and PostgreSQL persistence.
 
 ---
 
-## 2. Step 9.2 — React Feedback Analysis Integration
+## 2. Step 9.4 — Student Feedback Submission & PostgreSQL Persistence
 
-### Architecture & Information Flow
+In **Step 9.4**, the primary student feedback submission flow is connected to the backend persistence endpoint:
+`POST /api/v1/feedback/analyze-and-save`
+
+### End-to-End Information Flow
 
 ```text
        Student
@@ -19,37 +22,50 @@ The frontend provides an interactive, responsive web interface for students to s
   React Feedback Form
   (App.jsx — client validation)
           ↓
-    analysisApi.js
-  (Service Layer)
+  analyzeAndSaveFeedback()
+  (analysisApi.js Service Layer)
           ↓
-  POST /api/v1/feedback/analyze
+POST /api/v1/feedback/analyze-and-save
           ↓
        FastAPI
-  (Backend Endpoint)
+  (Validation & Error Handling)
           ↓
 FeedbackIntelligencePipeline
   (NLP + TF-IDF + Sentiment + Category + Priority)
           ↓
-     JSON Result
+PostgreSQL Database
+  (Feedback table persistence & commit)
           ↓
-  React Analysis Result Display
-  (Priority, Sentiment, Category, Cleaned Text)
+   FeedbackResponse JSON
+  (Database ID + Timestamps + Intelligence)
+          ↓
+  React UI Render
+  (Saved Confirmation Banner + Intelligence Cards)
 ```
 
-### Component Structure
-- **Feedback Form (`App.jsx`)**:
+### Component & State Architecture
+
+- **Feedback Submission Form (`App.jsx`)**:
   - Semantic `<label htmlFor="feedback-input">` and `<textarea>` with character counter.
   - Client-side validation preventing submission of empty or whitespace-only inputs.
   - Quick-fill sample buttons (`Needs Attention Sample`, `Positive Sample`, `Clear`).
   - Loading spinner indicator disabling the Analyze button during API calls to prevent duplicate submissions.
-  - User feedback text preserved in the input area across loading and error states.
+  - The previous analysis result is cleared immediately upon initiating a new submission so stale data cannot be mistaken for the current submission.
+  - User feedback text is preserved in the input area across loading and error states for seamless retries.
+- **Persistence Confirmation Banner (`App.jsx`)**:
+  - Displays a dedicated, accessible confirmation badge at the top of the results section:
+    - Status icon and `"Feedback Saved Successfully"`.
+    - Real database record identifier (`Feedback ID: #{result.id}`).
+    - Formatted creation timestamp (`Submitted: 14 Sep 2026, ...`).
+    - Uses `role="status"` and `aria-live="polite"` for assistive technology.
 - **Analysis Result Display (`App.jsx`)**:
   - **Priority Assessment**: Displays score (/100), visual meter, level (`HIGH`, `MEDIUM`, `LOW`) using accessible badge markers and text labels (not color alone), and deterministic administrative reasoning.
-  - **Sentiment Analysis**: Displays polarity (`NEGATIVE`, `NEUTRAL`, `POSITIVE`), model confidence percentage, and probability distribution across classes.
+  - **Sentiment Analysis**: Displays polarity (`NEGATIVE`, `NEUTRAL`, `POSITIVE`), model confidence percentage, and probability breakdown.
   - **Category Classification**: Displays primary category name, model confidence score, and top category probabilities breakdown.
   - **NLP Preprocessing Card**: Displays cleaned normalized text (`clean_text`), showing how sentiment-critical negation terms (`not`, `no`, `never`) are preserved.
 - **API Service Layer (`src/services/analysisApi.js`)**:
-  - Decoupled service function `analyzeFeedback(feedbackText)`.
+  - `analyzeAndSaveFeedback(feedbackText, metadata)`: Submits to `POST /api/v1/feedback/analyze-and-save` and returns the persisted record.
+  - `analyzeFeedback(feedbackText)`: Retained as an analysis-only service targeting `POST /api/v1/feedback/analyze`.
   - Configurable backend target via `VITE_API_BASE_URL` (defaults to `http://127.0.0.1:8000`).
   - Safe error handling translating HTTP 422, 503, 500, and network failures into user-friendly messages without exposing internal stack traces.
 

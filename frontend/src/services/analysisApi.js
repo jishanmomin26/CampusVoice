@@ -1,14 +1,15 @@
 /**
- * CampusVoice Feedback Analysis API Service
+ * CampusVoice Feedback Analysis & Persistence API Service
  * 
- * Handles HTTP communication with the FastAPI backend endpoint:
- * POST /api/v1/feedback/analyze
+ * Handles HTTP communication with the FastAPI backend endpoints:
+ * - POST /api/v1/feedback/analyze (In-memory analysis only)
+ * - POST /api/v1/feedback/analyze-and-save (Analysis with PostgreSQL persistence)
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 /**
- * Analyzes raw student feedback text via the CampusVoice ML intelligence pipeline.
+ * Analyzes raw student feedback text via the CampusVoice ML intelligence pipeline (in-memory only).
  * 
  * @param {string} feedbackText - Raw student feedback message.
  * @returns {Promise<Object>} The structured feedback intelligence result.
@@ -69,6 +70,91 @@ export async function analyzeFeedback(feedbackText) {
     return data;
   } catch (err) {
     // Distinguish network connection failures from application errors
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      throw new Error(
+        'Unable to connect to the CampusVoice analysis service. Please ensure the backend server is running at ' +
+        API_BASE_URL
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Analyzes raw student feedback text and persists the result to PostgreSQL (Step 9.4).
+ * 
+ * @param {string} feedbackText - Raw student feedback message.
+ * @param {Object} [metadata={}] - Optional metadata such as department and semester.
+ * @returns {Promise<Object>} The persisted FeedbackResponse object including database ID.
+ * @throws {Error} User-friendly error message on failure.
+ */
+export async function analyzeAndSaveFeedback(feedbackText, metadata = {}) {
+  if (!feedbackText || typeof feedbackText !== 'string' || !feedbackText.trim()) {
+    throw new Error('Please enter meaningful feedback before analyzing.');
+  }
+
+  const endpoint = `${API_BASE_URL}/api/v1/feedback/analyze-and-save`;
+
+  const payload = {
+    feedback: feedbackText,
+  };
+
+  if (metadata && typeof metadata === 'object') {
+    if (metadata.department && typeof metadata.department === 'string' && metadata.department.trim()) {
+      payload.department = metadata.department.trim();
+    }
+    if (metadata.semester && typeof metadata.semester === 'string' && metadata.semester.trim()) {
+      payload.semester = metadata.semester.trim();
+    }
+  }
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      if (response.status === 422) {
+        let message = 'Please enter meaningful feedback before analyzing.';
+        try {
+          const errorData = await response.json();
+          if (errorData.detail && Array.isArray(errorData.detail)) {
+            const firstMsg = errorData.detail[0]?.msg;
+            if (firstMsg && !firstMsg.includes('Value error,')) {
+              message = firstMsg;
+            }
+          }
+        } catch {
+          // Fall back to default friendly message
+        }
+        throw new Error(message);
+      }
+
+      if (response.status === 503) {
+        throw new Error('Feedback analysis models are temporarily unavailable. Please try again later.');
+      }
+
+      if (response.status >= 500) {
+        throw new Error('An unexpected error occurred while saving and analyzing your feedback. Please try again.');
+      }
+
+      throw new Error(`Request failed with status code ${response.status}. Please try again.`);
+    }
+
+    const data = await response.json();
+
+    // Verify persisted response structure matches expected contract
+    if (!data || typeof data.id !== 'number') {
+      throw new Error('Received an unexpected response format from the persistence service.');
+    }
+
+    return data;
+  } catch (err) {
     if (err.name === 'TypeError' && err.message.includes('fetch')) {
       throw new Error(
         'Unable to connect to the CampusVoice analysis service. Please ensure the backend server is running at ' +

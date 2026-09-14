@@ -582,6 +582,76 @@
   font-weight: 600;
 }
 
+/* Step 9.4: Persistence Confirmation Section */
+.saved-confirmation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 14px;
+  padding: 1rem 1.4rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 20px -5px rgba(16, 185, 129, 0.2);
+}
+
+.saved-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.saved-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #10b981;
+  color: #064e3b;
+  font-weight: 800;
+  font-size: 0.85rem;
+  border-radius: 50%;
+}
+
+.saved-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #34d399;
+  letter-spacing: -0.01em;
+}
+
+.saved-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.saved-id {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  color: #f1f5f9;
+}
+
+.saved-id strong {
+  color: #38bdf8;
+}
+
+.saved-time {
+  color: #94a3b8;
+}
+
+.saved-time strong {
+  color: #cbd5e1;
+}
+
 /* Footer */
 .footer {
   margin-top: auto;
@@ -626,6 +696,18 @@
     font-size: 2rem;
   }
 
+  .saved-confirmation {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .saved-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
   .meta-footer {
     flex-direction: column;
     gap: 0.4rem;
@@ -639,3 +721,4 @@
     width: 100%;
   }
 }
+

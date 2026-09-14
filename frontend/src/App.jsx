@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
-import { analyzeFeedback } from './services/analysisApi';
+import { analyzeAndSaveFeedback } from './services/analysisApi';
 
 function App() {
   const [feedbackText, setFeedbackText] = useState('');
@@ -22,12 +22,13 @@ function App() {
 
     setLoading(true);
     setError(null);
+    setResult(null); // Clear previous result immediately so stale data is not mistaken for a new submission
 
     try {
-      const data = await analyzeFeedback(feedbackText);
+      const data = await analyzeAndSaveFeedback(feedbackText);
       setResult(data);
     } catch (err) {
-      setError(err.message || 'An unexpected error occurred while analyzing your feedback.');
+      setError(err.message || 'An unexpected error occurred while saving and analyzing your feedback.');
       setResult(null);
     } finally {
       setLoading(false);
@@ -51,6 +52,25 @@ function App() {
     return `${(val * 100).toFixed(1)}%`;
   };
 
+  // Helper to format created_at ISO timestamp into human-readable string
+  const formatTimestamp = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
   // Priority level styling helper
   const getPriorityClass = (level) => {
     const l = (level || '').toLowerCase();
@@ -67,13 +87,27 @@ function App() {
     return 'sentiment-neutral';
   };
 
+  // Extracted metrics supporting both flat FeedbackResponse and nested objects
+  const priorityLevel = result?.priority_level || result?.priority?.level;
+  const priorityScore = result?.priority_score ?? result?.priority?.score ?? 0;
+  const priorityReason = result?.priority_reason || result?.priority?.reason;
+  const sentimentName = result?.sentiment_name || result?.sentiment?.name;
+  const sentimentConfidence = result?.sentiment_confidence ?? result?.sentiment?.confidence;
+  const categoryName = result?.category_name || result?.category?.name;
+  const categoryConfidence = result?.category_confidence ?? result?.category?.confidence;
+  const cleanText = result?.clean_text;
+  const sentimentProbabilities = result?.sentiment?.probabilities;
+  const categoryProbabilities = result?.category?.probabilities;
+  const sentimentModel = result?.models?.sentiment || 'logistic_regression';
+  const categoryModel = result?.models?.category || 'logistic_regression';
+
   return (
     <div className="container">
       {/* Header */}
       <header className="header">
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          Step 9.2 &bull; Intelligence Pipeline Connected
+          Step 9.4 &bull; PostgreSQL Persistence Connected
         </div>
         <h1 className="title">CampusVoice</h1>
         <p className="subtitle">AI-Powered Student Feedback Intelligence & Prioritization System</p>
@@ -155,7 +189,7 @@ function App() {
               {loading ? (
                 <>
                   <span className="btn-spinner" aria-hidden="true"></span>
-                  <span>Analyzing feedback with ML pipeline...</span>
+                  <span>Saving &amp; analyzing feedback with ML pipeline...</span>
                 </>
               ) : (
                 <span>Analyze Feedback</span>
@@ -165,68 +199,88 @@ function App() {
         </form>
       </section>
 
-      {/* Analysis Results Section */}
+      {/* Analysis Results & Persistence Section */}
       {result && (
         <section className="results-wrapper" aria-live="polite" aria-label="Feedback Intelligence Results">
+          {/* Step 9.4: Persistence Confirmation Section */}
+          {typeof result.id === 'number' && (
+            <div className="saved-confirmation" role="status" aria-live="polite">
+              <div className="saved-badge">
+                <span className="saved-icon" aria-hidden="true">&#10003;</span>
+                <span className="saved-title">Feedback Saved Successfully</span>
+              </div>
+              <div className="saved-meta">
+                <span className="saved-id">
+                  <strong>Feedback ID:</strong> #{result.id}
+                </span>
+                {result.created_at && (
+                  <span className="saved-time">
+                    <strong>Submitted:</strong> {formatTimestamp(result.created_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="results-header">
             <h2 className="results-title">Feedback Intelligence Breakdown</h2>
             <div className="models-tag">
-              Models: <span>{result.models?.sentiment} (Sentiment)</span> &bull; <span>{result.models?.category} (Category)</span>
+              Models: <span>{sentimentModel} (Sentiment)</span> &bull; <span>{categoryModel} (Category)</span>
             </div>
           </div>
 
           <div className="results-grid">
             {/* 1. Priority Assessment Card */}
-            <div className={`result-card priority-card ${getPriorityClass(result.priority?.level)}`}>
+            <div className={`result-card priority-card ${getPriorityClass(priorityLevel)}`}>
               <div className="card-header">
                 <span className="card-tag">Administrative Signal</span>
-                <span className={`priority-badge ${getPriorityClass(result.priority?.level)}`}>
-                  Level: {result.priority?.level?.toUpperCase()}
+                <span className={`priority-badge ${getPriorityClass(priorityLevel)}`}>
+                  Level: {priorityLevel ? priorityLevel.toUpperCase() : 'UNKNOWN'}
                 </span>
               </div>
               <h3 className="card-metric-title">Priority Assessment</h3>
               <div className="score-display">
-                <span className="score-number">{result.priority?.score}</span>
+                <span className="score-number">{priorityScore}</span>
                 <span className="score-total">/ 100</span>
               </div>
               <div className="score-bar-container" aria-hidden="true">
                 <div
-                  className={`score-bar-fill ${getPriorityClass(result.priority?.level)}`}
-                  style={{ width: `${result.priority?.score}%` }}
+                  className={`score-bar-fill ${getPriorityClass(priorityLevel)}`}
+                  style={{ width: `${priorityScore}%` }}
                 ></div>
               </div>
               <p className="card-explanation">
-                <strong>Reason:</strong> {result.priority?.reason}
+                <strong>Reason:</strong> {priorityReason || 'Deterministic assessment from confidence heuristics.'}
               </p>
             </div>
 
             {/* 2. Sentiment Classification Card */}
-            <div className={`result-card sentiment-card ${getSentimentClass(result.sentiment?.name)}`}>
+            <div className={`result-card sentiment-card ${getSentimentClass(sentimentName)}`}>
               <div className="card-header">
                 <span className="card-tag">Sentiment Analysis</span>
-                <span className={`sentiment-badge ${getSentimentClass(result.sentiment?.name)}`}>
-                  {result.sentiment?.name?.toUpperCase()}
+                <span className={`sentiment-badge ${getSentimentClass(sentimentName)}`}>
+                  {sentimentName ? sentimentName.toUpperCase() : 'UNKNOWN'}
                 </span>
               </div>
               <h3 className="card-metric-title">Detected Polarity</h3>
               <div className="confidence-row">
                 <span className="confidence-label">Model Confidence:</span>
-                <span className="confidence-value">{formatPercent(result.sentiment?.confidence)}</span>
+                <span className="confidence-value">{formatPercent(sentimentConfidence)}</span>
               </div>
 
-              {result.sentiment?.probabilities && (
+              {sentimentProbabilities && (
                 <div className="probabilities-block">
                   <div className="prob-item">
                     <span>Negative</span>
-                    <span>{formatPercent(result.sentiment.probabilities.negative)}</span>
+                    <span>{formatPercent(sentimentProbabilities.negative)}</span>
                   </div>
                   <div className="prob-item">
                     <span>Neutral</span>
-                    <span>{formatPercent(result.sentiment.probabilities.neutral)}</span>
+                    <span>{formatPercent(sentimentProbabilities.neutral)}</span>
                   </div>
                   <div className="prob-item">
                     <span>Positive</span>
-                    <span>{formatPercent(result.sentiment.probabilities.positive)}</span>
+                    <span>{formatPercent(sentimentProbabilities.positive)}</span>
                   </div>
                 </div>
               )}
@@ -236,17 +290,17 @@ function App() {
             <div className="result-card category-card">
               <div className="card-header">
                 <span className="card-tag">Topic Modeling</span>
-                <span className="category-badge">{result.category?.name}</span>
+                <span className="category-badge">{categoryName || 'Unknown'}</span>
               </div>
               <h3 className="card-metric-title">Identified Category</h3>
               <div className="confidence-row">
                 <span className="confidence-label">Model Confidence:</span>
-                <span className="confidence-value">{formatPercent(result.category?.confidence)}</span>
+                <span className="confidence-value">{formatPercent(categoryConfidence)}</span>
               </div>
 
-              {result.category?.probabilities && (
+              {categoryProbabilities && (
                 <div className="probabilities-block">
-                  {Object.entries(result.category.probabilities)
+                  {Object.entries(categoryProbabilities)
                     .sort(([, a], [, b]) => b - a)
                     .slice(0, 3)
                     .map(([cat, prob]) => (
@@ -268,7 +322,7 @@ function App() {
             </div>
             <h3 className="card-metric-title">Cleaned Normalized Text</h3>
             <p className="cleaned-text-display">
-              <code>{result.clean_text || '(no tokens remaining)'}</code>
+              <code>{cleanText || '(no tokens remaining)'}</code>
             </p>
             <p className="nlp-note">
               Sentiment-critical negation terms (such as <em>not</em>, <em>no</em>, <em>never</em>) are strictly retained during stopword filtering to ensure accurate polarity inference.
@@ -284,7 +338,7 @@ function App() {
           <span>&bull;</span>
           <span className="meta-item">FastAPI REST Endpoint</span>
           <span>&bull;</span>
-          <span className="meta-item">Priority Scoring Engine</span>
+          <span className="meta-item">PostgreSQL Persisted</span>
         </div>
       </footer>
     </div>
