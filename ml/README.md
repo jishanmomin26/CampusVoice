@@ -551,5 +551,118 @@ priority_result = scorer.calculate_from_intelligence(intelligence)
 print(priority_result)
 ```
 
+---
+
+## 13. Step 8.2 — Priority Scoring Pipeline Integration
+
+### Overview
+Step 8.2 composes the existing Step 7 `FeedbackIntelligencePipeline` with the Step 8.1 `PriorityScorer`. When analyzing student feedback, the unified pipeline automatically performs priority calculation as an integrated post-inference step.
+
+### Conceptual & Architectural Flow
+
+```text
+               Raw Feedback
+                    ↓
+             NLP Preprocessing
+          (Step 3 Lemmatization &
+          Negation Preservation)
+                    ↓
+             TF-IDF Transform
+          (Step 4 Fitted Vectorizer)
+                    ↓
+           Sentiment + Category
+          (Step 5 & Step 6 Models)
+                    ↓
+             PriorityScorer
+          (Step 8.1 Rule Engine)
+                    ↓
+        Unified Intelligence Result
+```
+
+### Key Architectural Characteristics
+1. **Compositional Design**: Step 8.2 composes existing components rather than duplicating logic. The `PriorityScorer` remains a standalone, reusable module (`ml.priority.priority_scoring.PriorityScorer`) that is cleanly instantiated and invoked by `FeedbackIntelligencePipeline`.
+2. **Deterministic & Rule-Based**: The priority score (0–100), level (`High`, `Medium`, `Low`), and reason are computed via transparent, explainable formulas driven by the model predictions and their confidence scores.
+3. **No Retraining or TF-IDF Refitting**: Underlying ML models (Logistic Regression / Naive Bayes) and the Step 4 TF-IDF vectorizer artifact are completely unchanged.
+4. **Full Backward Compatibility**: All original Step 7 output fields (`feedback`, `clean_text`, `sentiment`, `category`, `models`) remain present and structured identically. The newly calculated priority is appended under the `"priority"` key.
+
+### Unified Output Schema
+
+```json
+{
+  "feedback": "The faculty is not helpful and the explanations are not clear at all.",
+  "clean_text": "faculty not helpful explanation not clear",
+  "sentiment": {
+    "label": -1,
+    "name": "negative",
+    "confidence": 0.5216,
+    "probabilities": {
+      "negative": 0.5216,
+      "neutral": 0.3634,
+      "positive": 0.1150
+    }
+  },
+  "category": {
+    "name": "Teaching",
+    "confidence": 0.2507,
+    "probabilities": {
+      "Teaching": 0.2507,
+      "Course Content": 0.2476,
+      "Library Facilities": 0.1437,
+      "Examination": 0.1348,
+      "Lab Work": 0.1152,
+      "Extracurricular": 0.1080
+    }
+  },
+  "models": {
+    "sentiment": "logistic_regression",
+    "category": "logistic_regression"
+  },
+  "priority": {
+    "score": 65,
+    "level": "Medium",
+    "reason": "Negative sentiment detected with moderate confidence."
+  }
+}
+```
+
+### Reusable Usage Example
+
+```python
+from ml.pipeline.feedback_intelligence import FeedbackIntelligencePipeline, analyze_feedback
+
+# Option 1: Object-oriented pipeline with in-memory caching
+pipeline = FeedbackIntelligencePipeline(sentiment_model="best", category_model="best")
+result = pipeline.analyze_feedback("The laboratory computers are outdated and not functioning well.")
+
+print(f"Sentiment: {result['sentiment']['name']} ({result['sentiment']['confidence']:.1%})")
+print(f"Category:  {result['category']['name']} ({result['category']['confidence']:.1%})")
+print(f"Priority:  {result['priority']['level']} (Score: {result['priority']['score']}/100)")
+print(f"Reason:    {result['priority']['reason']}")
+
+# Option 2: Module-level convenience function
+quick_result = analyze_feedback("The library has an excellent book collection.")
+print(quick_result["priority"]["level"])  # "Low"
+```
+
+### Verification Commands
+
+```powershell
+# 1. Run Pipeline Demo with Priority Display
+python ml/pipeline/run_demo.py
+
+# 2. Run Step 7 & 8.2 Unified Pipeline Test Suite (41 tests)
+pytest ml/tests/test_feedback_intelligence.py -v
+
+# 3. Run Step 8.1 Standalone Priority Scorer Test Suite (21 tests)
+pytest ml/tests/test_priority_scoring.py -v
+
+# 4. Run Complete ML Suite (96 tests)
+pytest ml/tests/ -v
+
+# 5. Run Backend Regression Tests (15 tests)
+pytest backend/tests/ -v
+```
+
+
 
 

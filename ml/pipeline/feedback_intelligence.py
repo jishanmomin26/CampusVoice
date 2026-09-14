@@ -29,6 +29,7 @@ if str(ML_DIR) not in sys.path:
     sys.path.insert(0, str(ML_DIR))
 
 from app.nlp.preprocessing import preprocess_text
+from ml.priority.priority_scoring import PriorityScorer
 
 MODELS_DIR = ML_DIR / "models"
 
@@ -138,6 +139,9 @@ class FeedbackIntelligencePipeline:
         self._category_model = joblib.load(category_path)
         self._category_model_name = _resolve_model_type_name(self._category_model)
 
+        # 4. Initialize Step 8.1 Priority Scorer
+        self._priority_scorer = PriorityScorer()
+
     def analyze_feedback(self, text: str) -> Dict[str, Any]:
         """Analyzes raw student feedback text through the unified pipeline.
 
@@ -195,7 +199,7 @@ class FeedbackIntelligencePipeline:
             }
             category_conf = float(max(c_probs))
 
-        return {
+        result = {
             "feedback": text,
             "clean_text": clean_text,
             "sentiment": {
@@ -214,6 +218,12 @@ class FeedbackIntelligencePipeline:
                 "category": self._category_model_name,
             },
         }
+
+        # Step 8.1 / 8.2: Priority Scoring
+        priority_result = self._priority_scorer.calculate_from_intelligence(result)
+        result["priority"] = priority_result
+
+        return result
 
 
 # Global singleton instance for module-level convenience function

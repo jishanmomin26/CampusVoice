@@ -1,6 +1,6 @@
 """Comprehensive Unit and Integration Tests for the Unified Feedback Intelligence Pipeline.
 
-Validates 25 distinct conditions:
+Validates 25 Step 7 base conditions + 16 Step 8.2 priority integration conditions:
   1. Pipeline initializes successfully
   2. All required artifacts load into memory
   3. Valid feedback produces a structured result dictionary
@@ -26,6 +26,24 @@ Validates 25 distinct conditions:
   23. Vectorizer feature dimensions remain strictly unchanged
   24. TF-IDF transformation behavior (transform called, fit/fit_transform never called)
   25. In-memory model caching maintains identical object references without disk reloading
+
+Step 8.2 Priority Integration Conditions:
+  26. Normal pipeline output contains 'priority' field
+  27. Priority contains 'score', 'level', and 'reason'
+  28. Priority score is an integer bounded in [0, 100]
+  29. Priority level belongs to {'High', 'Medium', 'Low'}
+  30. Priority reason is a non-empty string
+  31. Priority values are derived from actual pipeline sentiment and category outputs
+  32. Negative high-confidence case produces High priority
+  33. Positive case produces Low priority
+  34. Priority calculation is deterministic across repeated calls
+  35. Sentiment output schema and values remain unchanged
+  36. Category output schema and values remain unchanged
+  37. Model-specific inference (Logistic Regression) includes priority
+  38. Model-specific inference (Naive Bayes) includes priority
+  39. Invalid input validation remains unchanged
+  40. TF-IDF transform-only behavior remains unchanged with priority
+  41. calculate_from_intelligence integration matches pipeline output
 """
 
 from pathlib import Path
@@ -51,6 +69,7 @@ from ml.pipeline.feedback_intelligence import (
     FeedbackIntelligencePipeline,
     analyze_feedback,
 )
+from ml.priority.priority_scoring import PriorityScorer
 
 
 @pytest.fixture(scope="module")
@@ -319,3 +338,154 @@ class TestModelCachingBehavior:
         assert id(pipeline._vectorizer) == vec_id
         assert id(pipeline._sentiment_model) == sent_id
         assert id(pipeline._category_model) == cat_id
+
+
+class TestPriorityIntegration:
+    """Validates Step 8.2 integration of PriorityScorer into FeedbackIntelligencePipeline."""
+
+    def test_priority_field_present(self, default_pipeline):
+        """Condition 1: Normal pipeline output contains a 'priority' field."""
+        result = default_pipeline.analyze_feedback("The classrooms are well-ventilated.")
+        assert "priority" in result
+        assert isinstance(result["priority"], dict)
+
+    def test_priority_contains_required_keys(self, default_pipeline):
+        """Condition 2: Priority contains score, level, and reason."""
+        result = default_pipeline.analyze_feedback("Great lab practical sessions.")
+        priority = result["priority"]
+        assert "score" in priority
+        assert "level" in priority
+        assert "reason" in priority
+
+    def test_priority_score_integer_and_bounded(self, default_pipeline):
+        """Condition 3: Priority score is an integer between 0 and 100."""
+        result = default_pipeline.analyze_feedback("Examination schedules are clear.")
+        score = result["priority"]["score"]
+        assert isinstance(score, int)
+        assert not isinstance(score, bool)
+        assert 0 <= score <= 100
+
+    def test_priority_level_valid_tier(self, default_pipeline):
+        """Condition 4: Priority level is one of High, Medium, Low."""
+        result = default_pipeline.analyze_feedback("The campus sports facilities are maintained.")
+        level = result["priority"]["level"]
+        assert level in {"High", "Medium", "Low"}
+
+    def test_priority_reason_non_empty_string(self, default_pipeline):
+        """Condition 5: Priority reason is a non-empty string."""
+        result = default_pipeline.analyze_feedback("Good library environment.")
+        reason = result["priority"]["reason"]
+        assert isinstance(reason, str)
+        assert len(reason.strip()) > 0
+
+    def test_priority_derived_from_actual_sentiment_and_category(self, default_pipeline):
+        """Condition 6: Priority values are derived from actual pipeline sentiment and category outputs."""
+        result = default_pipeline.analyze_feedback("The faculty is approachable and helpful.")
+        scorer = default_pipeline._priority_scorer
+
+        expected = scorer.calculate(
+            sentiment_name=result["sentiment"]["name"],
+            sentiment_confidence=result["sentiment"]["confidence"],
+            category_name=result["category"]["name"],
+            category_confidence=result["category"]["confidence"],
+        )
+        assert result["priority"] == expected
+
+    def test_negative_high_confidence_produces_high_priority_integration(self, default_pipeline):
+        """Condition 7: Negative high-confidence signals produce High priority."""
+        scorer = default_pipeline._priority_scorer
+        payload = {
+            "sentiment": {"name": "negative", "confidence": 0.85},
+            "category": {"name": "Teaching", "confidence": 0.75},
+        }
+        computed = scorer.calculate_from_intelligence(payload)
+        assert computed["level"] == "High"
+        assert computed["score"] == 90
+
+    def test_positive_case_produces_low_priority_integration(self, default_pipeline):
+        """Condition 8: Positive case produces Low priority according to Step 8.1 rules."""
+        result = default_pipeline.analyze_feedback(
+            "There should be more technical hackathons and cultural extracurricular activities."
+        )
+        assert result["sentiment"]["name"] == "positive"
+        assert result["priority"]["level"] == "Low"
+
+    def test_priority_determinism_across_repeated_calls(self, default_pipeline):
+        """Condition 9: Priority calculation is deterministic across repeated inference calls."""
+        text = "The laboratory computers are outdated and the equipment is not functioning well."
+        res1 = default_pipeline.analyze_feedback(text)
+        res2 = default_pipeline.analyze_feedback(text)
+        res3 = default_pipeline.analyze_feedback(text)
+
+        assert res1["priority"] == res2["priority"] == res3["priority"]
+
+    def test_existing_sentiment_output_unchanged(self, default_pipeline):
+        """Condition 10: Existing Step 7 sentiment output schema and values remain unchanged."""
+        result = default_pipeline.analyze_feedback("Library collection is extensive.")
+        sent = result["sentiment"]
+        assert set(sent.keys()) == {"label", "name", "confidence", "probabilities"}
+        assert sent["label"] in {-1, 0, 1}
+        assert 0.0 <= sent["confidence"] <= 1.0
+        assert isinstance(sent["probabilities"], dict)
+
+    def test_existing_category_output_unchanged(self, default_pipeline):
+        """Condition 11: Existing Step 7 category output schema and values remain unchanged."""
+        result = default_pipeline.analyze_feedback("Library collection is extensive.")
+        cat = result["category"]
+        assert set(cat.keys()) == {"name", "confidence", "probabilities"}
+        assert cat["name"] in CANONICAL_CATEGORIES
+        assert 0.0 <= cat["confidence"] <= 1.0
+        assert len(cat["probabilities"]) == 6
+
+    def test_model_specific_inference_priority_logistic_regression(self):
+        """Condition 12a: Logistic Regression pipeline includes priority correctly."""
+        pipeline = FeedbackIntelligencePipeline(
+            sentiment_model="logistic_regression",
+            category_model="logistic_regression",
+        )
+        result = pipeline.analyze_feedback("The syllabus should include cloud computing.")
+        assert "priority" in result
+        assert result["priority"]["level"] in {"High", "Medium", "Low"}
+
+    def test_model_specific_inference_priority_naive_bayes(self):
+        """Condition 12b: Naive Bayes pipeline includes priority correctly."""
+        pipeline = FeedbackIntelligencePipeline(
+            sentiment_model="naive_bayes",
+            category_model="naive_bayes",
+        )
+        result = pipeline.analyze_feedback("The syllabus should include cloud computing.")
+        assert "priority" in result
+        assert result["priority"]["level"] in {"High", "Medium", "Low"}
+
+    def test_invalid_inputs_still_rejected(self, default_pipeline):
+        """Condition 13: Existing invalid-input validation remains unchanged."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            default_pipeline.analyze_feedback("")
+        with pytest.raises(ValueError, match="cannot be empty or whitespace-only"):
+            default_pipeline.analyze_feedback("   \t  ")
+        with pytest.raises(ValueError, match="cannot be None"):
+            default_pipeline.analyze_feedback(None)
+        with pytest.raises(TypeError, match="must be a string"):
+            default_pipeline.analyze_feedback(9876)
+
+    def test_tfidf_transform_only_behavior_with_priority(self, default_pipeline):
+        """Condition 14: Existing TF-IDF transform-only behavior remains unchanged with priority."""
+        vectorizer = default_pipeline._vectorizer
+        vectorizer.fit = MagicMock(side_effect=RuntimeError("fit() called"))
+        vectorizer.fit_transform = MagicMock(side_effect=RuntimeError("fit_transform() called"))
+
+        try:
+            result = default_pipeline.analyze_feedback("Fair examination guidelines.")
+            assert "priority" in result
+            assert vectorizer.fit.call_count == 0
+            assert vectorizer.fit_transform.call_count == 0
+        finally:
+            del vectorizer.fit
+            del vectorizer.fit_transform
+
+    def test_calculate_from_intelligence_integration(self, default_pipeline):
+        """Condition 15: calculate_from_intelligence integration directly matches pipeline output."""
+        result = default_pipeline.analyze_feedback("The seminar was insightful.")
+        direct_priority = default_pipeline._priority_scorer.calculate_from_intelligence(result)
+        assert result["priority"] == direct_priority
+

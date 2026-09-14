@@ -18,7 +18,7 @@ from ml.pipeline.feedback_intelligence import FeedbackIntelligencePipeline
 def run_pipeline_demo() -> None:
     """Demonstrates unified feedback intelligence inference on representative student feedback."""
     print("=" * 80)
-    print("CAMPUSVOICE - STEP 7: UNIFIED FEEDBACK INTELLIGENCE PIPELINE DEMO")
+    print("CAMPUSVOICE - STEP 8.2: UNIFIED FEEDBACK INTELLIGENCE & PRIORITY SCORING DEMO")
     print("=" * 80)
     print("Initializing pipeline and loading in-memory model artifacts...")
 
@@ -64,6 +64,11 @@ def run_pipeline_demo() -> None:
         print(f"  Category:        {cat['name']} (Confidence: {cat['confidence']:.2%})")
         if cat_top_probs:
             print(f"                   Top 3 -> [{cat_top_probs}]")
+
+        # Priority summary (Step 8.1 / Step 8.2)
+        prio = result["priority"]
+        print(f"  Priority:        {prio['level'].upper()} (Score: {prio['score']}/100)")
+        print(f"                   Reason: \"{prio['reason']}\"")
 
         print(f"  Models:          Sentiment={result['models']['sentiment']}, Category={result['models']['category']}")
 
