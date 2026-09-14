@@ -1,15 +1,38 @@
 """Feedback API Endpoints."""
 
 import logging
+from pathlib import Path
+import sys
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+# Ensure CampusVoice project root is on sys.path so the ml package is discoverable
+def _ensure_project_root_in_path() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "ml").exists() and (parent / "backend").exists():
+            if str(parent) not in sys.path:
+                sys.path.insert(0, str(parent))
+            return parent
+    fallback = current.parents[4]
+    if str(fallback) not in sys.path:
+        sys.path.insert(0, str(fallback))
+    return fallback
+
+_ensure_project_root_in_path()
+
+from ml.pipeline.feedback_intelligence import analyze_feedback
 from app.db.session import get_db
 from app.models.feedback import Feedback
-from app.schemas.feedback import FeedbackCreate, FeedbackResponse
+from app.schemas.feedback import (
+    FeedbackAnalyzeAndSaveRequest,
+    FeedbackCreate,
+    FeedbackResponse,
+)
+from app.services.feedback_service import save_analyzed_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +76,81 @@ def create_feedback(
         db.rollback()
         logger.error(
             "Unexpected error while saving feedback: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while processing your request.",
+        )
+
+
+@router.post(
+    "/analyze-and-save",
+    response_model=FeedbackResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Analyze Student Feedback and Persist to Database",
+    description=(
+        "Executes the unified ML feedback intelligence pipeline on student feedback text "
+        "and immediately persists the resulting intelligence (clean text, sentiment, "
+        "category, and deterministic priority) into the PostgreSQL feedback table."
+    ),
+)
+def analyze_and_save_feedback(
+    payload: FeedbackAnalyzeAndSaveRequest,
+    db: Session = Depends(get_db),
+) -> Feedback:
+    """Analyze student feedback and persist the result into PostgreSQL."""
+    # 1. Execute ML Feedback Intelligence Pipeline
+    try:
+        analysis_result = analyze_feedback(payload.feedback)
+    except FileNotFoundError as exc:
+        logger.error(
+            "ML model or vectorizer artifact missing during feedback analysis: %s",
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Machine learning model artifacts are currently unavailable.",
+        )
+    except ValueError as exc:
+        logger.warning("Validation error during feedback analysis: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error during feedback analysis: %s", exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while analyzing the feedback text.",
+        )
+
+    # 2. Persist Analyzed Feedback to Database with Transaction Safety
+    try:
+        feedback_record = save_analyzed_feedback(
+            db=db,
+            feedback_text=payload.feedback,
+            analysis_result=analysis_result,
+            department=payload.department,
+            semester=payload.semester,
+        )
+        return feedback_record
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Database error while persisting analyzed feedback: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist feedback due to an internal database error.",
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error while persisting analyzed feedback: %s",
             type(exc).__name__,
             exc_info=True,
         )

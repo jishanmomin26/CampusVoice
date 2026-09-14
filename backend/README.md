@@ -235,7 +235,66 @@ Once the server is running, visit:
 
 ---
 
-## 11. Backend Project Structure
+## 11. Step 9.3 — Persist Analyzed Feedback to PostgreSQL
+
+In **Step 9.3**, the backend adds transactional database persistence for feedback intelligence results, storing the machine learning outputs directly alongside the feedback record in PostgreSQL.
+
+### Architecture Overview
+
+* **In-Memory vs. Persisted Endpoints**:
+  * `POST /api/v1/feedback/analyze`: Purely in-memory and analysis-only (used for interactive exploration and the real-time React analysis view). Does NOT persist records to the database.
+  * `POST /api/v1/feedback/analyze-and-save`: Analyzes student feedback via the unified ML pipeline and immediately commits the intelligence result to PostgreSQL in a single transactional operation.
+* **Database Model Extension**:
+  * The `Feedback` SQLAlchemy model (`feedback` table) is extended with nullable columns for the primary analysis attributes:
+    * `clean_text` (`Text`): Lemmatized, normalized text with negation preservation.
+    * `sentiment_label` (`Integer`): `-1` (Negative), `0` (Neutral), `1` (Positive).
+    * `sentiment_name` (`String(50)`): `"negative"`, `"neutral"`, `"positive"`.
+    * `sentiment_confidence` (`Float`): Calibrated model confidence score.
+    * `category_name` (`String(100)`): Predicted feedback topic (e.g., `"Teaching"`, `"Lab Work"`).
+    * `category_confidence` (`Float`): Confidence score for the predicted topic.
+    * `priority_score` (`Integer`): Bounded $[0, 100]$ priority score.
+    * `priority_level` (`String(20)`): Priority tier (`"High"`, `"Medium"`, `"Low"`).
+    * `priority_reason` (`Text`): Deterministic administrative reasoning.
+  * `department` and `semester` are made `nullable=True` so that feedback submitted without department metadata stores `NULL` without injecting fake or misleading placeholder strings.
+* **Service Layer**:
+  * `app.services.feedback_service.save_analyzed_feedback`: Encapsulates database mapping and transactional commit/rollback logic, cleanly isolating database operations from ML inference.
+* **Migration `002_add_analysis_fields_to_feedback`**:
+  * Adds all 9 analysis columns and alters `department` / `semester` to nullable.
+  * **Downgrade Safety**: Drops the 9 analysis columns. If reverting `department`/`semester` to `NOT NULL`, it checks for rows with `NULL` values and raises an informative error to prevent data loss or unauthorized placeholder fabrication.
+
+### Example: Analyze & Save Endpoint
+
+* **Endpoint**: `POST /api/v1/feedback/analyze-and-save`
+* **Status**: `201 Created`
+* **Request**:
+  ```json
+  {
+    "feedback": "The faculty is not helpful and the explanations are not clear."
+  }
+  ```
+* **Response (HTTP 201 Created)**:
+  ```json
+  {
+    "id": 5,
+    "department": null,
+    "semester": null,
+    "feedback_text": "The faculty is not helpful and the explanations are not clear.",
+    "clean_text": "faculty not helpful explanation not clear",
+    "sentiment_label": -1,
+    "sentiment_name": "negative",
+    "sentiment_confidence": 0.5216,
+    "category_name": "Teaching",
+    "category_confidence": 0.2507,
+    "priority_score": 65,
+    "priority_level": "Medium",
+    "priority_reason": "Negative sentiment detected with moderate confidence.",
+    "created_at": "2026-09-14T14:37:05.997888+05:30"
+  }
+  ```
+
+---
+
+## 12. Backend Project Structure
 
 ```text
 backend/
@@ -247,8 +306,8 @@ backend/
 │   │       └── endpoints/
 │   │           ├── __init__.py
 │   │           ├── health.py
-│   │           ├── feedback.py
-│   │           ├── analysis.py     # Feedback analysis & priority endpoint
+│   │           ├── feedback.py     # Submit, list, and analyze-and-save endpoints
+│   │           ├── analysis.py     # In-memory analysis & priority endpoint
 │   │           └── nlp.py          # NLP test endpoint
 │   ├── core/
 │   │   ├── __init__.py
@@ -259,25 +318,30 @@ backend/
 │   │   └── session.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── feedback.py
+│   │   └── feedback.py             # Extended Feedback model with analysis fields
 │   ├── nlp/                        # NLP processing module
 │   │   ├── __init__.py
 │   │   ├── preprocessing.py        # Normalization, tokenization, lemmatization
 │   │   └── resources.py            # NLTK & spaCy resource management
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   ├── feedback.py
+│   │   ├── feedback.py             # FeedbackCreate, FeedbackResponse, FeedbackAnalyzeAndSaveRequest
 │   │   ├── analysis.py             # Feedback analysis Pydantic schemas
 │   │   └── nlp.py                  # Preprocessing request & result schemas
+│   ├── services/                   # Service layer
+│   │   ├── __init__.py
+│   │   └── feedback_service.py     # Database persistence service
 │   ├── __init__.py
 │   └── main.py
 ├── tests/
 │   ├── __init__.py
-│   ├── test_analysis_endpoint.py   # Analysis API endpoint test suite
-│   └── test_nlp_preprocessing.py   # NLP preprocessing test suite
+│   ├── test_analysis_endpoint.py   # Analysis API endpoint test suite (18 tests)
+│   ├── test_feedback_persistence.py # Feedback persistence test suite (14 tests)
+│   └── test_nlp_preprocessing.py   # NLP preprocessing test suite (15 tests)
 ├── alembic/
 │   ├── versions/
-│   │   └── 001_create_feedback_table.py
+│   │   ├── 001_create_feedback_table.py
+│   │   └── 002_add_analysis_fields_to_feedback.py
 │   ├── env.py
 │   └── script.py.mako
 ├── alembic.ini
