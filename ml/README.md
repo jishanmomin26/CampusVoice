@@ -201,15 +201,146 @@ result = predict_sentiment("Great library collection!", model_name="naive_bayes"
 
 ---
 
-## 8. How to Run
+```
 
-### 1. Run Step 5 Model Training & Evaluation
+---
+
+## 8. Step 6 — Feedback Category Classification Models
+
+### Objective & Feedback Categories
+CampusVoice automatically categorizes incoming student feedback comments into one of six institutional categories:
+1. **Teaching**
+2. **Course Content**
+3. **Examination**
+4. **Lab Work**
+5. **Library Facilities**
+6. **Extracurricular**
+
+### Feature Representation & Train/Test Separation
+- **Feature Matrix**: Reuses the pre-fitted Step 4 `TfidfVectorizer` (2,720 features) without refitting.
+- **Data Partitions**: Strictly reuses the existing 80/20 stratified splits:
+  - **Training Set**: 578 samples
+  - **Held-Out Test Set**: 145 samples
+
+### Candidate Classification Models
+1. **Logistic Regression**
+   * Class: `sklearn.linear_model.LogisticRegression`
+   * Hyperparameters: `max_iter=2000`, `random_state=42`, `class_weight=None` (unweighted because category distributions are balanced).
+2. **Multinomial Naive Bayes**
+   * Class: `sklearn.naive_bayes.MultinomialNB`
+   * Hyperparameters: `alpha=1.0` (Laplace smoothing).
+
+### Evaluation & Model Selection Results (Held-Out Test Set)
+
+Evaluated strictly on the held-out test partition ($N = 145$). **Model Selection Metric: Macro F1**.
+
+| Metric | Logistic Regression | Multinomial Naive Bayes | Best Performer |
+| :--- | :---: | :---: | :---: |
+| **Accuracy** | **0.6621 (66.21%)** | 0.6345 (63.45%) | **Logistic Regression** |
+| **Precision (Macro)** | **0.6801** | 0.6715 | **Logistic Regression** |
+| **Recall (Macro)** | **0.6620** | 0.6343 | **Logistic Regression** |
+| **F1-Score (Macro)** | **0.6628** *(Selected Best)* | 0.6364 | **Logistic Regression (+4.1%)** |
+| **Precision (Weighted)** | **0.6776** | 0.6664 | **Logistic Regression** |
+| **Recall (Weighted)** | **0.6621** | 0.6345 | **Logistic Regression** |
+| **F1-Score (Weighted)** | **0.6615** | 0.6339 | **Logistic Regression** |
+
+### Per-Category Performance Breakdown (Best Model: Logistic Regression)
+
+| Category | Precision | Recall | F1-Score | Support |
+| :--- | :---: | :---: | :---: | :---: |
+| **Teaching** | 0.5926 | 0.6400 | 0.6154 | 25 |
+| **Course Content** | 0.7308 | 0.7917 | 0.7600 | 24 |
+| **Examination** | 0.7143 | 0.5769 | 0.6383 | 26 |
+| **Lab Work** | 0.7500 | 0.6818 | 0.7143 | 22 |
+| **Library Facilities** | 0.7500 | 0.5217 | 0.6154 | 23 |
+| **Extracurricular** | 0.5429 | 0.7600 | 0.6333 | 25 |
+| **Macro Average** | **0.6801** | **0.6620** | **0.6628** | **145** |
+| **Weighted Average** | **0.6776** | **0.6621** | **0.6615** | **145** |
+
+### 6×6 Confusion Matrices
+
+#### Logistic Regression
+```text
+Actual / Pred       | Teaching | Course Con | Examinat | Lab Work | Library Fa | Extracurr
+-----------------------------------------------------------------------------------------
+Teaching            |    16    |     0      |    1     |    3     |     2      |    3
+Course Content      |     1    |    19      |    1     |    1     |     0      |    2
+Examination         |     3    |     1      |   15     |    1     |     1      |    5
+Lab Work            |     1    |     2      |    3     |   15     |     0      |    1
+Library Facilities  |     2    |     3      |    1     |    0     |    12      |    5
+Extracurricular     |     4    |     1      |    0     |    0     |     1      |   19
+```
+
+#### Multinomial Naive Bayes
+```text
+Actual / Pred       | Teaching | Course Con | Examinat | Lab Work | Library Fa | Extracurr
+-----------------------------------------------------------------------------------------
+Teaching            |    16    |     1      |    2     |    3     |     1      |    2
+Course Content      |     1    |    20      |    3     |    0     |     0      |    0
+Examination         |     5    |     1      |   18     |    1     |     1      |    0
+Lab Work            |     2    |     1      |    4     |   15     |     0      |    0
+Library Facilities  |     3    |     3      |    4     |    0     |    11      |    2
+Extracurricular     |     6    |     3      |    3     |    0     |     1      |   12
+```
+
+Visual plots generated via pure Matplotlib are saved in `ml/evaluation/results/`:
+- `category_logistic_regression_confusion_matrix.png`
+- `category_naive_bayes_confusion_matrix.png`
+
+---
+
+## 9. Reusable Category Inference Utility
+
+Use `ml.models.category_inference.predict_category`:
+
+```python
+from ml.models.category_inference import predict_category
+
+# Predict using best category model (default)
+result = predict_category("The syllabus should include more modern cloud computing technologies.")
+print(result)
+# Output:
+# {
+#   'text': 'The syllabus should include more modern cloud computing technologies.',
+#   'clean_text': 'syllabus include modern cloud compute technology',
+#   'category': 'Course Content',
+#   'confidence': 0.78,
+#   'model_used': 'best',
+#   'probabilities': {
+#       'Course Content': 0.78,
+#       'Teaching': 0.08,
+#       'Lab Work': 0.06,
+#       'Examination': 0.04,
+#       'Extracurricular': 0.02,
+#       'Library Facilities': 0.02
+#   }
+# }
+
+# Explicit model selection: 'logistic_regression' or 'naive_bayes'
+result = predict_category("The library needs more reference books.", model_name="naive_bayes")
+```
+
+---
+
+## 10. Execution Commands
+
+### 1. Run Category Model Training & Evaluation (Step 6)
+```powershell
+python ml/training/train_and_evaluate_category.py
+```
+
+### 2. Run Sentiment Model Training & Evaluation (Step 5)
 ```powershell
 python ml/training/train_and_evaluate.py
 ```
 
-### 2. Run All Automated Tests
+### 3. Run Complete ML Test Suite
 ```powershell
 pytest ml/tests/ -v
+```
+
+### 4. Run Backend Regression Tests
+```powershell
 pytest backend/tests/ -v
 ```
+
