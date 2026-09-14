@@ -108,7 +108,44 @@ In **Step 9.6**, the frontend introduces the first controlled version of the **A
 
 ---
 
-## 4. Configuration & Environment Variables
+## 4. Step 9.9 — Admin Dashboard Feedback Records Table
+
+In **Step 9.9**, the Admin Dashboard is enhanced with a dedicated **Feedback Records Management** section positioned beneath the KPI cards and analytics charts.
+
+### Architecture & Key Capabilities
+
+* **API Service Layer (`src/services/recordsApi.js`)**:
+  * `getFeedbackRecords({ page, pageSize, search, sentiment, category, priority })`: Communicates directly with backend endpoint `GET /api/v1/feedback/records`.
+  * Constructs query parameters dynamically, safely omitting empty or default filter values.
+  * Robust error handling translating HTTP 422, 503, 500, and connection timeouts into user-friendly messages.
+* **Server-Side Keyword Search**:
+  * Searches `feedback_text` through PostgreSQL case-insensitive substring matching.
+  * 350ms debounced user input prevents unnecessary network requests during active typing.
+  * Automatic reset to page 1 upon search term alteration.
+  * Dedicated clear (`×`) button to quickly reset search.
+* **Multi-Criteria Dynamic Filtering**:
+  * **Sentiment**: Filter by `positive`, `neutral`, `negative` or view all.
+  * **Priority**: Filter by `high`, `medium`, `low` urgency tiers.
+  * **Dynamic Categories**: Populates category dropdown options dynamically from `stats.categories` (zero hardcoded ML labels).
+  * **Clear Filters Action**: One-click reset restoring default unfiltered records and returning to page 1.
+* **Server-Side Pagination**:
+  * Leverages backend metadata (`total`, `page`, `page_size`, `total_pages`).
+  * Displays informative status: `"Showing page X of Y · Z matching records"`.
+  * Configurable rows per page selector (`10`, `20`, `50`).
+  * Accessible Previous and Next navigation buttons with proper boundary disabling.
+  * Gracefully handles out-of-range or empty page results.
+* **Responsive Records Table (`src/components/FeedbackRecords.jsx` & `FeedbackRecords.css`)**:
+  * **Columns**: ID (`#id`), Feedback Message, Sentiment (color-coded badge), Sentiment Confidence (`%`), Category, Category Confidence (`%`), Priority (tier badge + score pill), Submitted (human-readable localized timestamp).
+  * **Legacy Record Safety**: Seamlessly displays `Unclassified` badges and `—` placeholders for records with `NULL` analysis fields without fabricating data or crashing.
+  * **Overflow & Mobile Support**: Contained within an accessible horizontally scrollable container (`table-responsive-container`) with touch scrolling enabled for tablet and mobile viewports (<768px and ~390px).
+* **Dedicated Component States**:
+  * Clean inline loading indicator with CSS spinner.
+  * Error alert banner with functional **Retry** button.
+  * Distinct empty state differentiating between an empty database and filter criteria that returned no matching records.
+
+---
+
+## 5. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -121,7 +158,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 5. Development & Build Commands
+## 6. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -140,4 +177,3 @@ npm run build
 cd frontend
 npm run preview
 ```
-

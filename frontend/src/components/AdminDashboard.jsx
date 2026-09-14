@@ -5,6 +5,7 @@ import {
   PriorityChart,
   CategoryChart,
 } from './DashboardCharts';
+import FeedbackRecords from './FeedbackRecords';
 import './AdminDashboard.css';
 
 /**
@@ -417,6 +418,9 @@ export default function AdminDashboard() {
             </>
           )}
           </section>
+
+          {/* 4. Feedback Records Management Table (Step 9.9) */}
+          <FeedbackRecords categories={stats?.categories} />
         </div>
       )}
     </div>
