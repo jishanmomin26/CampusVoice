@@ -167,6 +167,72 @@ Once the server is running, visit:
 * `POST /api/v1/feedback`: Ingests and stores student feedback in PostgreSQL.
 * `GET /api/v1/feedback`: Retrieves stored feedback records ordered by newest first.
 
+### Step 9.1 — Feedback Analysis API
+* `POST /api/v1/feedback/analyze`
+  * **Purpose**: Expose the existing unified ML feedback intelligence pipeline through FastAPI.
+  * **Flow**:
+    ```text
+    Client
+      ↓
+    POST /api/v1/feedback/analyze
+      ↓
+    Pydantic Validation
+      ↓
+    FeedbackIntelligencePipeline (cached singleton)
+      ↓
+    NLP + TF-IDF + Sentiment + Category + Priority
+      ↓
+    JSON Response
+    ```
+  * **Request Body**:
+    ```json
+    {
+      "feedback": "The faculty is not helpful and the explanations are not clear."
+    }
+    ```
+  * **Response Body**:
+    ```json
+    {
+      "feedback": "The faculty is not helpful and the explanations are not clear.",
+      "clean_text": "faculty not helpful explanation not clear",
+      "sentiment": {
+        "label": -1,
+        "name": "negative",
+        "confidence": 0.5216,
+        "probabilities": {
+          "negative": 0.5216,
+          "neutral": 0.3629,
+          "positive": 0.1155
+        }
+      },
+      "category": {
+        "name": "Teaching",
+        "confidence": 0.2507,
+        "probabilities": {
+          "Teaching": 0.2507,
+          "Course Content": 0.2476,
+          "Library Facilities": 0.1436,
+          "Examination": 0.1366,
+          "Lab Work": 0.1319,
+          "Extracurricular": 0.0895
+        }
+      },
+      "models": {
+        "sentiment": "logistic_regression",
+        "category": "logistic_regression"
+      },
+      "priority": {
+        "score": 65,
+        "level": "Medium",
+        "reason": "Negative sentiment detected with moderate confidence."
+      }
+    }
+    ```
+  * **Characteristics**:
+    * **Reusable Inference**: Delegates directly to the cached `FeedbackIntelligencePipeline` without reloading artifacts.
+    * **Deterministic & Explainable**: Priority scores and reasoning are computed deterministically from model confidence scores.
+    * **Pydantic v2 Validation**: Rejects non-string, empty, and whitespace-only requests with HTTP 422 while preserving exact raw feedback text.
+
 ---
 
 ## 11. Backend Project Structure
@@ -182,6 +248,7 @@ backend/
 │   │           ├── __init__.py
 │   │           ├── health.py
 │   │           ├── feedback.py
+│   │           ├── analysis.py     # Feedback analysis & priority endpoint
 │   │           └── nlp.py          # NLP test endpoint
 │   ├── core/
 │   │   ├── __init__.py
@@ -200,12 +267,14 @@ backend/
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── feedback.py
+│   │   ├── analysis.py             # Feedback analysis Pydantic schemas
 │   │   └── nlp.py                  # Preprocessing request & result schemas
 │   ├── __init__.py
 │   └── main.py
 ├── tests/
 │   ├── __init__.py
-│   └── test_nlp_preprocessing.py   # Pytest suite
+│   ├── test_analysis_endpoint.py   # Analysis API endpoint test suite
+│   └── test_nlp_preprocessing.py   # NLP preprocessing test suite
 ├── alembic/
 │   ├── versions/
 │   │   └── 001_create_feedback_table.py
