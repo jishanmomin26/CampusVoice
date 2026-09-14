@@ -1,0 +1,138 @@
+/* CampusVoice Dashboard Charts Styles (Step 9.7) */
+
+.chart-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.chart-responsive-box {
+  width: 100%;
+  min-height: 240px;
+}
+
+/* Custom Tooltip */
+.custom-chart-tooltip {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.6),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.tooltip-item-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.01em;
+}
+
+.tooltip-metrics {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.tooltip-count {
+  color: #ffffff;
+}
+
+.tooltip-count strong {
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.tooltip-share {
+  color: #94a3b8;
+}
+
+/* Custom Chart Legend */
+.chart-custom-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding-top: 0.25rem;
+}
+
+.legend-badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(11, 15, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.legend-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.legend-count {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.legend-pct {
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+
+/* Empty State */
+.chart-empty-container {
+  width: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 15, 25, 0.4);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.chart-empty-text {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  text-align: center;
+  margin: 0;
+}
+
+.category-chart-wrapper {
+  width: 100%;
+}
+
+/* Responsive Overrides */
+@media (max-width: 640px) {
+  .chart-custom-legend {
+    gap: 0.4rem;
+  }
+
+  .legend-badge-item {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.45rem;
+  }
+}

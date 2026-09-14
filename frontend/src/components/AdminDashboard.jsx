@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getFeedbackStats } from '../services/statsApi';
+import {
+  SentimentChart,
+  PriorityChart,
+  CategoryChart,
+} from './DashboardCharts';
 import './AdminDashboard.css';
 
 /**
@@ -197,7 +202,7 @@ export default function AdminDashboard() {
               </div>
               <div className="kpi-value high-priority-value">{priority.high}</div>
               <div className="kpi-footer">
-                <span>{calcPercent(priority.high, analyzed)} of analyzed</span>
+                <span>{calcPercent(priority.high, total)} of all feedback</span>
               </div>
             </div>
           </section>
@@ -211,6 +216,9 @@ export default function AdminDashboard() {
                 <span className="breakdown-subtitle">Model-classified polarity breakdown</span>
               </div>
 
+              {/* Step 9.7: Sentiment Donut Chart */}
+              <SentimentChart sentiment={sentiment} total={total} />
+
               <div className="stats-list">
                 {/* Positive */}
                 <div className="stat-row">
@@ -221,11 +229,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill sentiment-positive-fill"
-                      style={{ width: calcPercent(sentiment.positive, analyzed) }}
+                      style={{ width: calcPercent(sentiment.positive, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(sentiment.positive, analyzed)} of analyzed</span>
+                    <span>{calcPercent(sentiment.positive, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -238,11 +246,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill sentiment-neutral-fill"
-                      style={{ width: calcPercent(sentiment.neutral, analyzed) }}
+                      style={{ width: calcPercent(sentiment.neutral, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(sentiment.neutral, analyzed)} of analyzed</span>
+                    <span>{calcPercent(sentiment.neutral, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -255,11 +263,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill sentiment-negative-fill"
-                      style={{ width: calcPercent(sentiment.negative, analyzed) }}
+                      style={{ width: calcPercent(sentiment.negative, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(sentiment.negative, analyzed)} of analyzed</span>
+                    <span>{calcPercent(sentiment.negative, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -276,7 +284,7 @@ export default function AdminDashboard() {
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(sentiment.unclassified, total)} of total</span>
+                    <span>{calcPercent(sentiment.unclassified, total)} of all feedback</span>
                   </div>
                 </div>
               </div>
@@ -289,6 +297,9 @@ export default function AdminDashboard() {
                 <span className="breakdown-subtitle">Deterministic urgency distribution</span>
               </div>
 
+              {/* Step 9.7: Priority Bar Chart */}
+              <PriorityChart priority={priority} total={total} />
+
               <div className="stats-list">
                 {/* High */}
                 <div className="stat-row">
@@ -299,11 +310,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill priority-high-fill"
-                      style={{ width: calcPercent(priority.high, analyzed) }}
+                      style={{ width: calcPercent(priority.high, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(priority.high, analyzed)} of analyzed</span>
+                    <span>{calcPercent(priority.high, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -316,11 +327,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill priority-medium-fill"
-                      style={{ width: calcPercent(priority.medium, analyzed) }}
+                      style={{ width: calcPercent(priority.medium, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(priority.medium, analyzed)} of analyzed</span>
+                    <span>{calcPercent(priority.medium, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -333,11 +344,11 @@ export default function AdminDashboard() {
                   <div className="meter-track" aria-hidden="true">
                     <div
                       className="meter-fill priority-low-fill"
-                      style={{ width: calcPercent(priority.low, analyzed) }}
+                      style={{ width: calcPercent(priority.low, total) }}
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(priority.low, analyzed)} of analyzed</span>
+                    <span>{calcPercent(priority.low, total)} of all feedback</span>
                   </div>
                 </div>
 
@@ -354,7 +365,7 @@ export default function AdminDashboard() {
                     ></div>
                   </div>
                   <div className="stat-meta">
-                    <span>{calcPercent(priority.unclassified, total)} of total</span>
+                    <span>{calcPercent(priority.unclassified, total)} of all feedback</span>
                   </div>
                 </div>
               </div>
@@ -380,7 +391,11 @@ export default function AdminDashboard() {
                 <p>No categorized feedback records found in the database.</p>
               </div>
             ) : (
-              <div className="categories-grid">
+              <>
+                {/* Step 9.7: Dynamic Category Horizontal Bar Chart */}
+                <CategoryChart categories={categories} total={total} />
+
+                <div className="categories-grid">
                 {categoryEntries.map(([catName, count]) => (
                   <div key={catName} className="category-item-card">
                     <div className="category-item-header">
@@ -390,16 +405,17 @@ export default function AdminDashboard() {
                     <div className="meter-track" aria-hidden="true">
                       <div
                         className="meter-fill category-meter-fill"
-                        style={{ width: calcPercent(count, analyzed) }}
+                        style={{ width: calcPercent(count, total) }}
                       ></div>
                     </div>
                     <div className="category-item-meta">
-                      <span>{calcPercent(count, analyzed)} of analyzed feedback</span>
+                      <span>{calcPercent(count, total)} of all feedback</span>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+            </>
+          )}
           </section>
         </div>
       )}
