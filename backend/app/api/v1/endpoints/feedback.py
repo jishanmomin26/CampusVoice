@@ -3,8 +3,8 @@
 import logging
 from pathlib import Path
 import sys
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -30,9 +30,11 @@ from app.models.feedback import Feedback
 from app.schemas.feedback import (
     FeedbackAnalyzeAndSaveRequest,
     FeedbackCreate,
+    FeedbackRecordsResponse,
     FeedbackResponse,
     FeedbackStatsResponse,
 )
+from app.services.feedback_records_service import get_feedback_records
 from app.services.feedback_service import save_analyzed_feedback
 from app.services.feedback_stats_service import get_feedback_statistics
 
@@ -193,6 +195,62 @@ def get_feedback_stats(
     except Exception as exc:
         logger.error(
             "Unexpected error while calculating feedback statistics: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while processing your request.",
+        )
+
+
+@router.get(
+    "/records",
+    response_model=FeedbackRecordsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Paginated Feedback Records",
+    description=(
+        "Retrieves paginated, filtered feedback records for the administrator dashboard "
+        "table. Supports pagination, keyword search in feedback text, sentiment filtering, "
+        "category filtering, priority filtering, and deterministic newest-first ordering."
+    ),
+)
+def get_feedback_records_endpoint(
+    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(default=10, ge=1, le=100, description="Items per page (max: 100)"),
+    search: Optional[str] = Query(default=None, description="Case-insensitive keyword search in feedback text"),
+    sentiment: Optional[str] = Query(default=None, description="Sentiment filter (positive, neutral, negative)"),
+    category: Optional[str] = Query(default=None, description="Category filter (dynamic, case-insensitive)"),
+    priority: Optional[str] = Query(default=None, description="Priority filter (high, medium, low)"),
+    db: Session = Depends(get_db),
+) -> FeedbackRecordsResponse:
+    """Retrieve paginated and filtered feedback records from PostgreSQL."""
+    try:
+        records_data = get_feedback_records(
+            db=db,
+            page=page,
+            page_size=page_size,
+            search=search,
+            sentiment=sentiment,
+            category=category,
+            priority=priority,
+        )
+        return FeedbackRecordsResponse.model_validate(records_data)
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Database error while fetching feedback records: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve feedback records due to an internal database error.",
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error while fetching feedback records: %s",
             type(exc).__name__,
             exc_info=True,
         )

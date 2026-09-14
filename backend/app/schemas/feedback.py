@@ -1,7 +1,7 @@
 """Pydantic v2 Schemas for Feedback & Persisted Analysis."""
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -179,4 +179,98 @@ class FeedbackStatsResponse(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FeedbackRecordItem(BaseModel):
+    """Schema representing an individual feedback record in the records query response."""
+
+    id: int = Field(..., description="Unique feedback record ID", examples=[1])
+    department: Optional[str] = Field(
+        default=None,
+        description="Academic department related to the feedback",
+        examples=["Computer Science"],
+    )
+    semester: Optional[str] = Field(
+        default=None,
+        description="Academic semester or term",
+        examples=["Semester 4"],
+    )
+    feedback_text: str = Field(
+        ...,
+        description="Student's raw feedback message",
+        examples=["The laboratory equipment needs more regular maintenance."],
+    )
+    clean_text: Optional[str] = Field(
+        default=None,
+        description="NLP-preprocessed normalized text with negation preserved",
+    )
+    sentiment_label: Optional[int] = Field(
+        default=None,
+        description="Numeric sentiment label (-1 for negative, 0 for neutral, 1 for positive)",
+    )
+    sentiment_name: Optional[str] = Field(
+        default=None,
+        description="Canonical sentiment name (negative, neutral, positive)",
+    )
+    sentiment_confidence: Optional[float] = Field(
+        default=None,
+        description="Calibrated confidence score for the predicted sentiment",
+    )
+    category_name: Optional[str] = Field(
+        default=None,
+        description="Identified feedback category (e.g., Teaching, Lab Work)",
+    )
+    category_confidence: Optional[float] = Field(
+        default=None,
+        description="Confidence score for the predicted category",
+    )
+    priority_score: Optional[int] = Field(
+        default=None,
+        description="Deterministic priority score between 0 and 100",
+    )
+    priority_level: Optional[str] = Field(
+        default=None,
+        description="Priority tier: High, Medium, or Low",
+    )
+    priority_reason: Optional[str] = Field(
+        default=None,
+        description="Explainable administrative reasoning for priority assignment",
+    )
+    created_at: datetime = Field(
+        ..., description="Timezone-aware timestamp of creation"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FeedbackRecordsResponse(BaseModel):
+    """Paginated records response schema for the Admin Dashboard feedback management table."""
+
+    items: List[FeedbackRecordItem] = Field(
+        default_factory=list,
+        description="List of feedback records matching active filters for the current page",
+    )
+    total: int = Field(
+        ...,
+        ge=0,
+        description="Total number of feedback records matching active filters across all pages",
+    )
+    page: int = Field(
+        ...,
+        ge=1,
+        description="Current page number (1-indexed)",
+    )
+    page_size: int = Field(
+        ...,
+        ge=1,
+        description="Number of items returned per page",
+    )
+    total_pages: int = Field(
+        ...,
+        ge=0,
+        description="Total number of pages based on total matching records and page size",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
 

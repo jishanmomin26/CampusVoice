@@ -353,7 +353,116 @@ In **Step 9.5**, the backend implements a database-backed aggregation API (`GET 
 
 ---
 
-## 13. Backend Project Structure
+## 13. Step 9.8 — Database-Backed Feedback Records API (Admin Dashboard Table Engine)
+
+In **Step 9.8**, the backend implements a database-backed, paginated, and filtered records retrieval endpoint (`GET /api/v1/feedback/records`) to power the future Admin Dashboard feedback-management table.
+
+### Architecture & Capabilities
+
+* **Database-Level Execution**:
+  * Filtering, keyword search, counting, ordering, and pagination are executed entirely within PostgreSQL via SQLAlchemy queries.
+  * No bulk records or text embeddings are loaded into Python memory for client-side slicing.
+* **Pagination**:
+  * `page` (integer, default: `1`, minimum: `1`): The 1-indexed page number.
+  * `page_size` (integer, default: `10`, minimum: `1`, maximum: `100`): The number of records returned per page.
+  * `offset = (page - 1) * page_size` and `limit = page_size`.
+  * Out-of-range pages return `items: []` alongside the accurate `total` count and computed `total_pages`.
+* **Keyword Search**:
+  * `search` (string, optional): Case-insensitive substring matching against `feedback_text` using PostgreSQL-compatible `Feedback.feedback_text.ilike(f"%{search}%")`.
+  * Leading and trailing whitespace is trimmed; empty or whitespace-only inputs are ignored.
+* **Sentiment Filtering**:
+  * `sentiment` (string, optional): Filters by `sentiment_name`.
+  * Allowed values (case-insensitive): `positive`, `neutral`, `negative`.
+  * Unclassified records with `sentiment_name = NULL` are excluded from sentiment-filtered results.
+  * Invalid sentiment values return `HTTP 422 Unprocessable Entity` with a clear validation error.
+* **Dynamic Category Filtering**:
+  * `category` (string, optional): Dynamic case-insensitive matching against `category_name`.
+  * Fully dynamic — does not hardcode ML category names.
+  * Non-existent categories return an empty items list (`total: 0`, `items: []`) rather than an error.
+* **Priority Tier Filtering**:
+  * `priority` (string, optional): Filters by `priority_level`.
+  * Allowed values (case-insensitive): `high`, `medium`, `low`.
+  * Unclassified records with `priority_level = NULL` are excluded from priority-filtered results.
+  * Invalid priority values return `HTTP 422 Unprocessable Entity`.
+* **Combined Filters**:
+  * Multiple active filters are combined using SQL `WHERE` conjunctions (`AND`), guaranteeing that returned records satisfy all specified criteria simultaneously.
+* **Deterministic Ordering**:
+  * Default ordering: `created_at DESC` (newest feedback first).
+  * Stable secondary ordering: `id DESC` to ensure deterministic ordering when multiple records share identical timestamps.
+* **NULL Handling for Legacy Records**:
+  * Unclassified legacy records return `null` for uncomputed analysis attributes (`sentiment_name`, `category_name`, `priority_level`, `clean_text`, etc.) without fabricating placeholder data.
+
+### Request & Response Examples
+
+#### Example 1: Default Paginated Query
+* **Request**:
+  ```http
+  GET /api/v1/feedback/records?page=1&page_size=10
+  ```
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "items": [
+      {
+        "id": 9,
+        "department": null,
+        "semester": null,
+        "feedback_text": "The chemistry lab equipment is outdated and malfunctioning during experiments.",
+        "clean_text": "chemistry lab equipment outdated malfunction experiment",
+        "sentiment_label": -1,
+        "sentiment_name": "negative",
+        "sentiment_confidence": 0.5388,
+        "category_name": "Lab Work",
+        "category_confidence": 0.6381,
+        "priority_score": 70,
+        "priority_level": "High",
+        "priority_reason": "Negative sentiment detected with moderate confidence.",
+        "created_at": "2026-09-14T15:26:50.451178+05:30"
+      }
+    ],
+    "total": 9,
+    "page": 1,
+    "page_size": 10,
+    "total_pages": 1
+  }
+  ```
+
+#### Example 2: Combined Filter Query
+* **Request**:
+  ```http
+  GET /api/v1/feedback/records?search=faculty&category=Teaching&sentiment=negative&priority=medium&page=1&page_size=5
+  ```
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "items": [
+      {
+        "id": 8,
+        "department": null,
+        "semester": null,
+        "feedback_text": "The faculty is not helpful and the explanations are not clear.",
+        "clean_text": "faculty not helpful explanation not clear",
+        "sentiment_label": -1,
+        "sentiment_name": "negative",
+        "sentiment_confidence": 0.5216,
+        "category_name": "Teaching",
+        "category_confidence": 0.2507,
+        "priority_score": 65,
+        "priority_level": "Medium",
+        "priority_reason": "Negative sentiment detected with moderate confidence.",
+        "created_at": "2026-09-14T15:14:07.505955+05:30"
+      }
+    ],
+    "total": 3,
+    "page": 1,
+    "page_size": 5,
+    "total_pages": 1
+  }
+  ```
+
+---
+
+## 14. Backend Project Structure
 
 ```text
 backend/
@@ -365,7 +474,7 @@ backend/
 │   │       └── endpoints/
 │   │           ├── __init__.py
 │   │           ├── health.py
-│   │           ├── feedback.py         # Stats, submit, list, and analyze-and-save endpoints
+│   │           ├── feedback.py         # Stats, records, submit, list, and analyze-and-save endpoints
 │   │           ├── analysis.py         # In-memory analysis & priority endpoint
 │   │           └── nlp.py              # NLP test endpoint
 │   ├── core/
@@ -384,19 +493,21 @@ backend/
 │   │   └── resources.py                # NLTK & spaCy resource management
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   ├── feedback.py                 # FeedbackCreate, FeedbackResponse, FeedbackStatsResponse
+│   │   ├── feedback.py                 # FeedbackCreate, FeedbackResponse, Stats, and Records schemas
 │   │   ├── analysis.py                 # Feedback analysis Pydantic schemas
 │   │   └── nlp.py                      # Preprocessing request & result schemas
 │   ├── services/                       # Service layer
 │   │   ├── __init__.py
 │   │   ├── feedback_service.py         # Database persistence service
-│   │   └── feedback_stats_service.py   # Database statistics aggregation service
+│   │   ├── feedback_stats_service.py   # Database statistics aggregation service
+│   │   └── feedback_records_service.py # Database records retrieval, filtering & pagination service
 │   ├── __init__.py
 │   └── main.py
 ├── tests/
 │   ├── __init__.py
 │   ├── test_analysis_endpoint.py       # Analysis API endpoint test suite (18 tests)
 │   ├── test_feedback_persistence.py    # Feedback persistence test suite (14 tests)
+│   ├── test_feedback_records.py        # Feedback records API test suite (32 tests)
 │   ├── test_feedback_stats.py          # Feedback statistics test suite (9 tests)
 │   └── test_nlp_preprocessing.py       # NLP preprocessing test suite (15 tests)
 ├── alembic/
@@ -411,3 +522,4 @@ backend/
 ├── .env                                (local, gitignored)
 └── README.md
 ```
+
