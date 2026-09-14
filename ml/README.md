@@ -344,3 +344,119 @@ pytest ml/tests/ -v
 pytest backend/tests/ -v
 ```
 
+---
+
+## 11. Step 7 — Unified Feedback Intelligence Pipeline
+
+### Overview
+In Step 7, the separate machine learning and NLP components developed across Steps 3–6 are unified into a single, cohesive, and reusable inference pipeline. Rather than invoking preprocessing, feature transformation, sentiment analysis, and category prediction as fragmented scripts, the `FeedbackIntelligencePipeline` offers a clean, reusable inference engine that takes raw feedback text and produces complete sentiment and topic intelligence in a single call.
+
+### Architecture & Conceptual Flow
+
+```text
+               Raw Student Feedback
+                        ↓
+          Step 3 NLP Preprocessing
+          (Normalization + Lemmatization + Negation Preservation)
+                        ↓
+             Cleaned Normalized Text
+                        ↓
+          Step 4 Fitted TF-IDF Vectorizer
+          (2,720 Features — transform() only, no refitting)
+                        ↓
+             Unified Feature Vector (X_vec)
+                        │
+         ┌──────────────┴──────────────┐
+         ↓                             ↓
+Step 5 Sentiment Model        Step 6 Category Model
+(Logistic Regression / NB)    (Logistic Regression / NB)
+         ↓                             ↓
+Label, Name, Probs, Conf      Category, Probs, Conf
+         └──────────────┬──────────────┘
+                        ↓
+        Unified Feedback Intelligence Output
+```
+
+### Key Design Principles
+1. **Component Reuse**:
+   - **Step 3 Preprocessing**: Reuses `backend/app/nlp/preprocessing.py:preprocess_text`. Preserves sentiment-critical negation tokens (`not`, `no`, `never`).
+   - **Step 4 TF-IDF Features**: Loads `ml/models/tfidf_vectorizer.joblib` once. Strictly executes `transform()`; never calls `fit()` or `fit_transform()`.
+   - **Step 5 Sentiment Models**: Reuses `ml/models/best_sentiment_model.joblib` (or model-specific variants).
+   - **Step 6 Category Models**: Reuses `ml/models/best_category_model.joblib` (or model-specific variants).
+2. **In-Memory Model Caching**:
+   - Model artifacts and the vectorizer are loaded from disk once upon `FeedbackIntelligencePipeline` initialization.
+   - Repeated calls to `pipeline.analyze_feedback(...)` reuse identical in-memory instances, eliminating redundant disk I/O and deserialization latency.
+3. **Robust Input Validation**:
+   - Validates that inputs are non-null strings with meaningful content.
+   - Rejects `None`, empty strings `""`, whitespace-only strings, and non-string types with explicit exceptions (`ValueError`, `TypeError`).
+4. **Stable Output Schema**:
+   - Returns a structured dictionary containing input text, clean text, sentiment sub-object, category sub-object, and models used.
+
+### Output Schema
+
+```json
+{
+  "feedback": "The professor is not helpful and the explanations are not clear at all.",
+  "clean_text": "faculty not helpful explanation not clear",
+  "sentiment": {
+    "label": -1,
+    "name": "negative",
+    "confidence": 0.5216,
+    "probabilities": {
+      "negative": 0.5216,
+      "neutral": 0.3634,
+      "positive": 0.1150
+    }
+  },
+  "category": {
+    "name": "Teaching",
+    "confidence": 0.2507,
+    "probabilities": {
+      "Teaching": 0.2507,
+      "Course Content": 0.2476,
+      "Library Facilities": 0.1437,
+      "Examination": 0.1348,
+      "Lab Work": 0.1152,
+      "Extracurricular": 0.1080
+    }
+  },
+  "models": {
+    "sentiment": "logistic_regression",
+    "category": "logistic_regression"
+  }
+}
+```
+
+### Usage: Reusable Inference Pipeline
+
+```python
+from ml.pipeline.feedback_intelligence import FeedbackIntelligencePipeline, analyze_feedback
+
+# Option 1: Object-oriented pipeline with in-memory caching (Recommended for repeated calls)
+pipeline = FeedbackIntelligencePipeline(sentiment_model="best", category_model="best")
+result = pipeline.analyze_feedback("The laboratory equipment is outdated and not working.")
+print(f"Sentiment: {result['sentiment']['name']} ({result['sentiment']['confidence']:.1%})")
+print(f"Category:  {result['category']['name']} ({result['category']['confidence']:.1%})")
+
+# Option 2: Convenience function with module-level singleton cache
+quick_result = analyze_feedback("The library collection is fantastic and has quiet study spaces.")
+print(quick_result["category"]["name"])  # 'Library Facilities'
+```
+
+### Execution Commands
+
+```powershell
+# 1. Run Step 7 Pipeline Demo
+python ml/pipeline/run_demo.py
+
+# 2. Run Step 7 Automated Test Suite (25 conditions)
+pytest ml/tests/test_feedback_intelligence.py -v
+
+# 3. Run Complete ML Test Suite (59 tests)
+pytest ml/tests/ -v
+
+# 4. Run Backend Regression Tests (15 tests)
+pytest backend/tests/ -v
+```
+
+
