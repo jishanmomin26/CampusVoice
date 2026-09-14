@@ -10,6 +10,9 @@ from app.schemas.feedback import (
     FeedbackAnalyzeAndSaveRequest,
     FeedbackCreate,
     FeedbackResponse,
+    FeedbackStatsResponse,
+    PriorityStats,
+    SentimentStats,
 )
 from app.schemas.nlp import PreprocessingRequest, PreprocessingResult
 
@@ -20,9 +23,12 @@ __all__ = [
     "FeedbackAnalysisResponse",
     "FeedbackCreate",
     "FeedbackResponse",
+    "FeedbackStatsResponse",
     "ModelProvenance",
     "PreprocessingRequest",
     "PreprocessingResult",
     "PriorityAnalysisResult",
+    "PriorityStats",
     "SentimentAnalysisResult",
+    "SentimentStats",
 ]

@@ -1,7 +1,7 @@
 """Pydantic v2 Schemas for Feedback & Persisted Analysis."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -145,3 +145,38 @@ class FeedbackResponse(BaseModel):
 
     # Pydantic v2 ORM mode configuration
     model_config = ConfigDict(from_attributes=True)
+
+
+class SentimentStats(BaseModel):
+    """Aggregate statistics broken down by sentiment polarity."""
+
+    positive: int = Field(default=0, ge=0, description="Count of positive feedback records")
+    neutral: int = Field(default=0, ge=0, description="Count of neutral feedback records")
+    negative: int = Field(default=0, ge=0, description="Count of negative feedback records")
+    unclassified: int = Field(default=0, ge=0, description="Count of records without sentiment classification")
+
+
+class PriorityStats(BaseModel):
+    """Aggregate statistics broken down by priority tier."""
+
+    high: int = Field(default=0, ge=0, description="Count of high-priority feedback records")
+    medium: int = Field(default=0, ge=0, description="Count of medium-priority feedback records")
+    low: int = Field(default=0, ge=0, description="Count of low-priority feedback records")
+    unclassified: int = Field(default=0, ge=0, description="Count of records without priority tier")
+
+
+class FeedbackStatsResponse(BaseModel):
+    """Aggregate statistics response schema for the feedback dashboard."""
+
+    total_feedback: int = Field(..., ge=0, description="Total number of feedback records in database")
+    analyzed_feedback: int = Field(..., ge=0, description="Total number of analyzed feedback records")
+    unclassified_feedback: int = Field(..., ge=0, description="Total number of legacy or unanalyzed records")
+    sentiment: SentimentStats = Field(..., description="Sentiment polarity distribution")
+    priority: PriorityStats = Field(..., description="Priority tier distribution")
+    categories: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Dynamic breakdown of feedback counts across categories",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+

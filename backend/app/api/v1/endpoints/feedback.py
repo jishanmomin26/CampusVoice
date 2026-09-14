@@ -31,8 +31,10 @@ from app.schemas.feedback import (
     FeedbackAnalyzeAndSaveRequest,
     FeedbackCreate,
     FeedbackResponse,
+    FeedbackStatsResponse,
 )
 from app.services.feedback_service import save_analyzed_feedback
+from app.services.feedback_stats_service import get_feedback_statistics
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +153,46 @@ def analyze_and_save_feedback(
     except Exception as exc:
         logger.error(
             "Unexpected error while persisting analyzed feedback: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while processing your request.",
+        )
+
+
+@router.get(
+    "/stats",
+    response_model=FeedbackStatsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Feedback Statistics",
+    description=(
+        "Retrieves dynamic, database-backed aggregate feedback statistics for the "
+        "administrator dashboard, including total volume, analyzed vs. unclassified counts, "
+        "sentiment breakdown, priority distribution, and dynamic category frequency."
+    ),
+)
+def get_feedback_stats(
+    db: Session = Depends(get_db),
+) -> FeedbackStatsResponse:
+    """Retrieve aggregate feedback statistics from PostgreSQL."""
+    try:
+        stats = get_feedback_statistics(db)
+        return FeedbackStatsResponse.model_validate(stats)
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Database error while calculating feedback statistics: %s",
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve feedback statistics due to an internal database error.",
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error while calculating feedback statistics: %s",
             type(exc).__name__,
             exc_info=True,
         )

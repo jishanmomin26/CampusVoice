@@ -294,7 +294,66 @@ In **Step 9.3**, the backend adds transactional database persistence for feedbac
 
 ---
 
-## 12. Backend Project Structure
+## 12. Step 9.5 — Feedback Statistics API (Admin Dashboard Foundation)
+
+In **Step 9.5**, the backend implements a database-backed aggregation API (`GET /api/v1/feedback/stats`) designed to serve as the statistical engine for the future Admin Dashboard.
+
+### Architecture & Design Decisions
+
+* **Direct Database Aggregation**:
+  * Employs SQL-level aggregate functions (`func.count()`) and `group_by()` executed directly in PostgreSQL.
+  * Avoids memory bloat by **never** loading large feedback text records or embeddings into Python memory.
+* **Schema Contract (`FeedbackStatsResponse`)**:
+  * `total_feedback` (`int`): Total count of records in the `feedback` table.
+  * `analyzed_feedback` (`int`): Count of records where `sentiment_name IS NOT NULL`.
+  * `unclassified_feedback` (`int`): Count of records where `sentiment_name IS NULL`.
+    * *Invariant*: `total_feedback == analyzed_feedback + unclassified_feedback`.
+  * `sentiment` (`SentimentStats`):
+    * `positive`, `neutral`, `negative`, `unclassified`
+  * `priority` (`PriorityStats`):
+    * `high`, `medium`, `low`, `unclassified`
+  * `categories` (`Dict[str, int]`):
+    * Dynamically discovered dictionary mapping category names to frequency counts.
+    * Categories are derived purely from existing database records (zero hardcoded category lists).
+    * `NULL` category values are safely excluded from the dictionary.
+* **Case Normalization & Robustness**:
+  * Sentiment and priority groupings utilize `func.lower()` to prevent casing discrepancies (e.g., `"Negative"` vs `"negative"`).
+  * Null handling routes legacy unclassified records cleanly into `.unclassified` fields.
+* **Route Ordering**:
+  * Registered as `GET /api/v1/feedback/stats` before generic collection routes (`GET /api/v1/feedback`) and any future dynamic path parameters (`GET /api/v1/feedback/{id}`) to eliminate routing collisions.
+
+### Example: Feedback Statistics Endpoint
+
+* **Endpoint**: `GET /api/v1/feedback/stats`
+* **Status**: `200 OK`
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "total_feedback": 8,
+    "analyzed_feedback": 4,
+    "unclassified_feedback": 4,
+    "sentiment": {
+      "positive": 1,
+      "neutral": 0,
+      "negative": 3,
+      "unclassified": 4
+    },
+    "priority": {
+      "high": 0,
+      "medium": 3,
+      "low": 1,
+      "unclassified": 4
+    },
+    "categories": {
+      "Teaching": 3,
+      "Library Facilities": 1
+    }
+  }
+  ```
+
+---
+
+## 13. Backend Project Structure
 
 ```text
 backend/
@@ -306,9 +365,9 @@ backend/
 │   │       └── endpoints/
 │   │           ├── __init__.py
 │   │           ├── health.py
-│   │           ├── feedback.py     # Submit, list, and analyze-and-save endpoints
-│   │           ├── analysis.py     # In-memory analysis & priority endpoint
-│   │           └── nlp.py          # NLP test endpoint
+│   │           ├── feedback.py         # Stats, submit, list, and analyze-and-save endpoints
+│   │           ├── analysis.py         # In-memory analysis & priority endpoint
+│   │           └── nlp.py              # NLP test endpoint
 │   ├── core/
 │   │   ├── __init__.py
 │   │   └── config.py
@@ -318,26 +377,28 @@ backend/
 │   │   └── session.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── feedback.py             # Extended Feedback model with analysis fields
-│   ├── nlp/                        # NLP processing module
+│   │   └── feedback.py                 # Extended Feedback model with analysis fields
+│   ├── nlp/                            # NLP processing module
 │   │   ├── __init__.py
-│   │   ├── preprocessing.py        # Normalization, tokenization, lemmatization
-│   │   └── resources.py            # NLTK & spaCy resource management
+│   │   ├── preprocessing.py            # Normalization, tokenization, lemmatization
+│   │   └── resources.py                # NLTK & spaCy resource management
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   ├── feedback.py             # FeedbackCreate, FeedbackResponse, FeedbackAnalyzeAndSaveRequest
-│   │   ├── analysis.py             # Feedback analysis Pydantic schemas
-│   │   └── nlp.py                  # Preprocessing request & result schemas
-│   ├── services/                   # Service layer
+│   │   ├── feedback.py                 # FeedbackCreate, FeedbackResponse, FeedbackStatsResponse
+│   │   ├── analysis.py                 # Feedback analysis Pydantic schemas
+│   │   └── nlp.py                      # Preprocessing request & result schemas
+│   ├── services/                       # Service layer
 │   │   ├── __init__.py
-│   │   └── feedback_service.py     # Database persistence service
+│   │   ├── feedback_service.py         # Database persistence service
+│   │   └── feedback_stats_service.py   # Database statistics aggregation service
 │   ├── __init__.py
 │   └── main.py
 ├── tests/
 │   ├── __init__.py
-│   ├── test_analysis_endpoint.py   # Analysis API endpoint test suite (18 tests)
-│   ├── test_feedback_persistence.py # Feedback persistence test suite (14 tests)
-│   └── test_nlp_preprocessing.py   # NLP preprocessing test suite (15 tests)
+│   ├── test_analysis_endpoint.py       # Analysis API endpoint test suite (18 tests)
+│   ├── test_feedback_persistence.py    # Feedback persistence test suite (14 tests)
+│   ├── test_feedback_stats.py          # Feedback statistics test suite (9 tests)
+│   └── test_nlp_preprocessing.py       # NLP preprocessing test suite (15 tests)
 ├── alembic/
 │   ├── versions/
 │   │   ├── 001_create_feedback_table.py
@@ -347,6 +408,6 @@ backend/
 ├── alembic.ini
 ├── requirements.txt
 ├── .env.example
-├── .env                            (local, gitignored)
+├── .env                                (local, gitignored)
 └── README.md
 ```
