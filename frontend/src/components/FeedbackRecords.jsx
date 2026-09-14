@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getFeedbackRecords } from '../services/recordsApi';
+import FeedbackRecordDetail from './FeedbackRecordDetail';
 import './FeedbackRecords.css';
 
 /**
@@ -20,6 +21,9 @@ export default function FeedbackRecords({ categories }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
+
+  // Selected record for full detail view (Step 9.10)
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   // Status state
   const [loading, setLoading] = useState(true);
@@ -340,12 +344,13 @@ export default function FeedbackRecords({ categories }) {
                 <th scope="col" className="col-confidence">Category Conf.</th>
                 <th scope="col" className="col-priority">Priority</th>
                 <th scope="col" className="col-submitted">Submitted</th>
+                <th scope="col" className="col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {records.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan="8" className="empty-table-cell">
+                  <td colSpan="9" className="empty-table-cell">
                     <div className="empty-records-state">
                       <span className="empty-icon" aria-hidden="true">&#128269;</span>
                       <p className="empty-primary-text">
@@ -398,6 +403,16 @@ export default function FeedbackRecords({ categories }) {
                     </td>
                     <td className="cell-submitted">
                       <span className="timestamp-text">{formatTimestamp(record.created_at)}</span>
+                    </td>
+                    <td className="cell-actions">
+                      <button
+                        type="button"
+                        className="view-details-btn"
+                        onClick={() => setSelectedRecord(record)}
+                        aria-label={`View details for feedback #${record.id}`}
+                      >
+                        View Details
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -466,6 +481,14 @@ export default function FeedbackRecords({ categories }) {
           </div>
         </div>
       </div>
+
+      {/* Detail Modal View (Step 9.10) */}
+      {selectedRecord && (
+        <FeedbackRecordDetail
+          record={selectedRecord}
+          onClose={() => setSelectedRecord(null)}
+        />
+      )}
     </section>
   );
 }

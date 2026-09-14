@@ -145,7 +145,48 @@ In **Step 9.9**, the Admin Dashboard is enhanced with a dedicated **Feedback Rec
 
 ---
 
-## 5. Configuration & Environment Variables
+## 5. Step 9.10 — Feedback Record Detail / Full Analysis View
+
+In **Step 9.10**, the Admin Dashboard introduces a focused, in-depth **Feedback Record Detail Modal** (`FeedbackRecordDetail.jsx`), allowing administrators to inspect complete ML intelligence for any individual feedback record without navigating away, reloading the page, or executing redundant network requests.
+
+### Architecture & Key Capabilities
+
+* **Zero-Extra-Endpoint Architecture**:
+  * Leverages the rich dataset already loaded by `GET /api/v1/feedback/records`.
+  * The backend records endpoint provides all 14 necessary fields (`id`, `department`, `semester`, `feedback_text`, `clean_text`, `created_at`, `sentiment_name`, `sentiment_label`, `sentiment_confidence`, `category_name`, `category_confidence`, `priority_score`, `priority_level`, `priority_reason`).
+  * Modal opens instantaneously upon user interaction without network latency or additional server overhead.
+* **Component Architecture (`src/components/FeedbackRecordDetail.jsx` & `FeedbackRecordDetail.css`)**:
+  * **Dialog Accessibility**: Formatted with `role="dialog"`, `aria-modal="true"`, semantic header, and accessible dismiss triggers.
+  * **Dismissal Modes**:
+    * Dedicated close button (`×`).
+    * Clicking outside the modal container on the glassmorphic backdrop.
+    * Keyboard shortcut: Pressing <kbd>Escape</kbd> automatically dismisses the modal and restores focus.
+  * **State Preservation**:
+    * Opening and closing the detail view does not re-fetch the records table, preserving the administrator's active page number, search query, and filter selections.
+* **Comprehensive Multi-Dimensional Intelligence Display**:
+  * **Header & Metadata**: Record ID (`#id`), localized creation timestamp, department, and semester.
+  * **Original Feedback Text**: Full student submission rendered inside a styled quote callout block.
+  * **NLP Preprocessed / Normalized Text**: Displays the cleaned, tokenized, and negation-preserved text (`clean_text`) produced by the NLP pipeline.
+  * **Sentiment Analysis Card**:
+    * Sentiment badge (`Positive`, `Neutral`, `Negative`, or `Unclassified`).
+    * Calibrated model confidence score with progress bar (`XX.X%`).
+    * Raw model label code (`LABEL_2`, `LABEL_1`, `LABEL_0`, or `Unclassified`).
+  * **Feedback Category Card**:
+    * Classified institutional category name (`Faculty & Teaching`, `Course Content`, `Infrastructure & Facilities`, etc.).
+    * Calibrated category confidence score with progress meter (`XX.X%`).
+  * **Priority Assessment Card**:
+    * Urgency tier badge (`HIGH`, `MEDIUM`, `LOW`, or `Unclassified`).
+    * Exact deterministic priority score out of 100 with visual meter.
+    * Explainable administrative reasoning text (`priority_reason`).
+* **Safe Handling of Legacy & Unclassified Records**:
+  * Records with `NULL` analysis fields (such as legacy records inserted before Step 7 intelligence pipeline integration) display graceful placeholders (`"Not available"`, `"Not provided"`, `"Unclassified"`, and `"—"`).
+  * Absolutely zero synthetic or fabricated values are displayed, and no runtime exceptions are triggered.
+* **Fully Responsive Design**:
+  * Seamlessly adapts across Desktop (>1024px), Tablet (768px), and Mobile (390px) viewports with constrained max-height, backdrop-filter blur, and smooth vertical scrolling.
+
+---
+
+## 6. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -158,7 +199,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 6. Development & Build Commands
+## 7. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -177,3 +218,4 @@ npm run build
 cd frontend
 npm run preview
 ```
+

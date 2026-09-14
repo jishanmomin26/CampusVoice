@@ -411,6 +411,45 @@
   white-space: nowrap;
 }
 
+.col-actions {
+  width: 110px;
+  text-align: center;
+}
+
+.cell-actions {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.view-details-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+  font-family: inherit;
+  font-size: 0.775rem;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-details-btn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+}
+
+.view-details-btn:focus-visible {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
+}
+
 /* Priority Cell */
 .priority-cell {
   display: flex;
