@@ -452,11 +452,104 @@ python ml/pipeline/run_demo.py
 # 2. Run Step 7 Automated Test Suite (25 conditions)
 pytest ml/tests/test_feedback_intelligence.py -v
 
-# 3. Run Complete ML Test Suite (59 tests)
+# 3. Run Step 8.1 Priority Scoring Test Suite (21 conditions)
+pytest ml/tests/test_priority_scoring.py -v
+
+# 4. Run Complete ML Test Suite (80 tests)
 pytest ml/tests/ -v
 
-# 4. Run Backend Regression Tests (15 tests)
+# 5. Run Backend Regression Tests (15 tests)
 pytest backend/tests/ -v
 ```
+
+---
+
+## 12. Step 8.1 — Priority Scoring Engine
+
+### Purpose
+Educational institutions receive hundreds of student feedback comments across diverse departments. Institutional administrators need a transparent, explainable, and deterministic mechanism to prioritize incoming feedback for review without subjective guesswork or opaque scoring. 
+
+The **Priority Scoring Engine** is a rule-based, deterministic scoring layer that converts Step 7 intelligence signals into an actionable priority score (0–100), an administrative priority level (`High`, `Medium`, `Low`), and a transparent reason.
+
+> [!NOTE]
+> This engine is strictly rule-based and explainable. It does **not** train or modify any machine learning models, does not refit TF-IDF, and does not use arbitrary keyword severity heuristics.
+
+### Conceptual Flow
+
+```text
+               Step 7 Intelligence
+                        ↓
+             Sentiment + Confidence
+                        +
+             Category + Confidence
+                        ↓
+             Priority Scoring Engine
+                        ↓
+              Score + Level + Reason
+```
+
+### Deterministic Scoring Formula
+
+1. **Primary Signal: Sentiment Base Score**
+   - **Negative**:
+     - Confidence $\ge 0.70 \implies \text{Base Score} = 80$
+     - Confidence $\ge 0.50 \implies \text{Base Score} = 65$
+     - Confidence $< 0.50 \implies \text{Base Score} = 50$
+   - **Neutral**:
+     - Confidence $\ge 0.70 \implies \text{Base Score} = 30$
+     - Confidence $\ge 0.50 \implies \text{Base Score} = 25$
+     - Confidence $< 0.50 \implies \text{Base Score} = 20$
+   - **Positive**:
+     - Confidence $\ge 0.70 \implies \text{Base Score} = 10$
+     - Confidence $\ge 0.50 \implies \text{Base Score} = 5$
+     - Confidence $< 0.50 \implies \text{Base Score} = 0$
+
+2. **Secondary Signal: Category Confidence Adjustment**
+   - Confidence $\ge 0.70 \implies +10$
+   - Confidence $\ge 0.50 \implies +5$
+   - Confidence $< 0.50 \implies +0$
+
+3. **Score Clamping**:
+   $$\text{Final Score} = \max(0, \min(100, \text{Base Score} + \text{Category Adjustment}))$$
+
+### Priority Level Thresholds
+
+| Final Score Range | Priority Level | Administrative Meaning |
+| :---: | :---: | :--- |
+| **70 – 100** | **High** | High-priority feedback requiring prompt administrative attention |
+| **40 – 69** | **Medium** | Moderate-priority feedback for standard departmental review |
+| **0 – 39** | **Low** | Routine inquiry or positive remarks with low immediate action priority |
+
+### Reusable Usage Example
+
+```python
+from ml.priority.priority_scoring import PriorityScorer
+
+scorer = PriorityScorer()
+
+# Example 1: High-confidence negative feedback with clear category
+result = scorer.calculate(
+    sentiment_name="Negative",
+    sentiment_confidence=0.82,
+    category_name="Teaching",
+    category_confidence=0.76,
+)
+print(result)
+# Output:
+# {
+#     "score": 90,
+#     "level": "High",
+#     "reason": "Negative sentiment with high confidence and clearly identified feedback category."
+# }
+
+# Example 2: Directly from Step 7 intelligence output
+from ml.pipeline.feedback_intelligence import FeedbackIntelligencePipeline
+
+pipeline = FeedbackIntelligencePipeline()
+intelligence = pipeline.analyze_feedback("The laboratory computers are outdated.")
+priority_result = scorer.calculate_from_intelligence(intelligence)
+print(priority_result)
+```
+
 
 
