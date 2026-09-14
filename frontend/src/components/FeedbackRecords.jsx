@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getFeedbackRecords } from '../services/recordsApi';
+import { getFeedbackRecords, fetchAllMatchingFeedbackRecords } from '../services/recordsApi';
+import { exportFeedbackToCSV, exportFeedbackToExcel } from '../utils/exportFeedback';
 import FeedbackRecordDetail from './FeedbackRecordDetail';
 import './FeedbackRecords.css';
 
@@ -24,6 +25,12 @@ export default function FeedbackRecords({ categories }) {
 
   // Selected record for full detail view (Step 9.10)
   const [selectedRecord, setSelectedRecord] = useState(null);
+
+  // Export state (Step 9.11)
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportingType, setExportingType] = useState(null);
+  const [exportProgress, setExportProgress] = useState(null);
+  const [exportError, setExportError] = useState(null);
 
   // Status state
   const [loading, setLoading] = useState(true);
@@ -126,6 +133,49 @@ export default function FeedbackRecords({ categories }) {
     setPage(1);
   };
 
+  // Handle CSV and Excel Export (Step 9.11)
+  const handleExport = async (type) => {
+    if (isExporting || total === 0) return;
+
+    setIsExporting(true);
+    setExportingType(type);
+    setExportError(null);
+    setExportProgress(null);
+
+    try {
+      // Collect all records matching active filters across all pages
+      const allMatchingRecords = await fetchAllMatchingFeedbackRecords(
+        {
+          search: debouncedSearch.trim() || undefined,
+          sentiment: sentiment !== 'all' ? sentiment : undefined,
+          category: category !== 'all' ? category : undefined,
+          priority: priority !== 'all' ? priority : undefined,
+        },
+        (currentPage, totalPages, loadedCount, totalExpected) => {
+          if (totalPages > 1) {
+            setExportProgress(`Fetching page ${currentPage} of ${totalPages}...`);
+          }
+        }
+      );
+
+      if (!allMatchingRecords || allMatchingRecords.length === 0) {
+        throw new Error('No records to export.');
+      }
+
+      if (type === 'csv') {
+        exportFeedbackToCSV(allMatchingRecords);
+      } else if (type === 'excel') {
+        exportFeedbackToExcel(allMatchingRecords);
+      }
+    } catch (err) {
+      setExportError(err.message || `Failed to export records to ${type.toUpperCase()}. Please try again.`);
+    } finally {
+      setIsExporting(false);
+      setExportingType(null);
+      setExportProgress(null);
+    }
+  };
+
   // Helper formatting functions
   const formatConfidence = (val) => {
     if (typeof val !== 'number' || isNaN(val)) return '—';
@@ -201,12 +251,64 @@ export default function FeedbackRecords({ categories }) {
             Search, filter, and inspect individual student feedback submissions stored in PostgreSQL.
           </p>
         </div>
-        <div className="records-header-meta">
+        <div className="records-header-actions">
           <span className="records-total-badge" aria-live="polite">
             {total} {total === 1 ? 'Record' : 'Records'} Matching
           </span>
+          <div className="export-buttons-group" role="group" aria-label="Export matching feedback records">
+            <button
+              type="button"
+              id="export-csv-btn"
+              className="export-btn export-btn-csv"
+              onClick={() => handleExport('csv')}
+              disabled={loading || isExporting || total === 0}
+              aria-label={`Export ${total} matching feedback records to CSV`}
+              title={total === 0 ? 'No records to export' : `Export ${total} records to CSV`}
+            >
+              <span className="export-btn-icon" aria-hidden="true">&#128196;</span>
+              <span>
+                {isExporting && exportingType === 'csv'
+                  ? (exportProgress || 'Preparing CSV...')
+                  : `Export CSV${total > 0 ? ` (${total})` : ''}`}
+              </span>
+            </button>
+            <button
+              type="button"
+              id="export-excel-btn"
+              className="export-btn export-btn-excel"
+              onClick={() => handleExport('excel')}
+              disabled={loading || isExporting || total === 0}
+              aria-label={`Export ${total} matching feedback records to Excel`}
+              title={total === 0 ? 'No records to export' : `Export ${total} records to Excel`}
+            >
+              <span className="export-btn-icon" aria-hidden="true">&#128202;</span>
+              <span>
+                {isExporting && exportingType === 'excel'
+                  ? (exportProgress || 'Preparing Excel...')
+                  : `Export Excel${total > 0 ? ` (${total})` : ''}`}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Export Error Banner */}
+      {exportError && (
+        <div className="export-error-banner" role="alert">
+          <div className="export-error-content">
+            <span className="export-error-icon" aria-hidden="true">&#9888;</span>
+            <span>{exportError}</span>
+          </div>
+          <button
+            type="button"
+            className="export-error-dismiss"
+            onClick={() => setExportError(null)}
+            aria-label="Dismiss export error"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="records-toolbar" role="search" aria-label="Filter feedback records">

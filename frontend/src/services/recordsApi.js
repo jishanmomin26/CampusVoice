@@ -118,3 +118,62 @@ export async function getFeedbackRecords({
     throw err;
   }
 }
+
+/**
+ * Sequentially fetches all feedback records matching active filters across all pages (Step 9.11).
+ * Respects backend maximum page_size constraint (100) and preserves deterministic newest-first ordering.
+ * 
+ * @param {Object} [filters={}] - Active search and categorization filters
+ * @param {string} [filters.search] - Search keyword
+ * @param {string} [filters.sentiment] - Sentiment filter
+ * @param {string} [filters.category] - Category filter
+ * @param {string} [filters.priority] - Priority filter
+ * @param {Function} [onProgress] - Optional callback (currentPage, totalPages, loadedCount, totalExpected)
+ * @returns {Promise<Array<Object>>} Array of all matching record objects
+ */
+export async function fetchAllMatchingFeedbackRecords(filters = {}, onProgress = null) {
+  const EXPORT_PAGE_SIZE = 100;
+
+  // Fetch first page to obtain total and total_pages
+  const firstPageData = await getFeedbackRecords({
+    page: 1,
+    pageSize: EXPORT_PAGE_SIZE,
+    search: filters.search,
+    sentiment: filters.sentiment,
+    category: filters.category,
+    priority: filters.priority,
+  });
+
+  const total = firstPageData.total || 0;
+  const totalPages = firstPageData.total_pages || 0;
+  const allRecords = [...(firstPageData.items || [])];
+
+  if (typeof onProgress === 'function') {
+    onProgress(1, totalPages || 1, allRecords.length, total);
+  }
+
+  // Fetch subsequent pages sequentially if total_pages > 1
+  if (totalPages > 1) {
+    for (let p = 2; p <= totalPages; p++) {
+      const pageData = await getFeedbackRecords({
+        page: p,
+        pageSize: EXPORT_PAGE_SIZE,
+        search: filters.search,
+        sentiment: filters.sentiment,
+        category: filters.category,
+        priority: filters.priority,
+      });
+
+      if (Array.isArray(pageData.items)) {
+        allRecords.push(...pageData.items);
+      }
+
+      if (typeof onProgress === 'function') {
+        onProgress(p, totalPages, allRecords.length, total);
+      }
+    }
+  }
+
+  return allRecords;
+}
+

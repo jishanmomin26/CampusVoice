@@ -186,7 +186,58 @@ In **Step 9.10**, the Admin Dashboard introduces a focused, in-depth **Feedback 
 
 ---
 
-## 6. Configuration & Environment Variables
+## 6. Step 9.11 — Feedback Export & Reporting
+
+In **Step 9.11**, the Admin Dashboard adds comprehensive, client-side **CSV** and **Excel (.xlsx)** export capabilities (`exportFeedback.js`), empowering institutional leaders to download feedback intelligence matching their active filter selections.
+
+### Architecture & Key Capabilities
+
+* **Local Browser-Side Generation**:
+  * All export transformations, formatting, and file generation happen strictly within the user's browser.
+  * No feedback data is transmitted to external third-party services or APIs.
+  * Object URLs used for download triggers are revoked immediately after delivery.
+* **All-Matching-Records Architecture**:
+  * The export represents **all records** matching the current search and filter criteria, rather than only the records displayed on the current pagination page.
+  * Respects the backend maximum `page_size` constraint (`100` items per request) via `fetchAllMatchingFeedbackRecords`.
+  * If matching records span multiple pages, the client fetches pages sequentially using the backend's `total_pages` metadata, preventing uncontrolled parallel requests or memory spikes.
+* **Preservation of Active View & State**:
+  * Exporting data never resets or modifies the administrator's active page number, search input, debounced query, or dropdown filter selections.
+* **CSV Export (`exportFeedbackToCSV`)**:
+  * Formatted strictly according to RFC 4180 standards.
+  * Correctly escapes fields containing commas, double quotes (`""`), carriage returns, and newlines.
+  * Prepends a UTF-8 Byte Order Mark (`\uFEFF`) ensuring that special characters and multi-line feedback open seamlessly in Microsoft Excel.
+* **Excel Export (`exportFeedbackToExcel`)**:
+  * Generates native binary `.xlsx` workbooks powered by **SheetJS (`xlsx` v0.18.5)**.
+  * Standard sheet name: `"Feedback Records"`.
+  * Applies practical spreadsheet optimizations, including frozen header rows and auto-adjusted readable column widths (`!cols`).
+* **Standardized 14 Export Columns**:
+  1. `ID`
+  2. `Department`
+  3. `Semester`
+  4. `Original Feedback`
+  5. `Processed Text`
+  6. `Sentiment`
+  7. `Sentiment Label`
+  8. `Sentiment Confidence`
+  9. `Category`
+  10. `Category Confidence`
+  11. `Priority Level`
+  12. `Priority Score`
+  13. `Priority Reason`
+  14. `Submitted`
+* **Safe NULL Handling for Legacy & Incomplete Records**:
+  * Missing classifications default to `"Unclassified"`.
+  * Missing numerical values (confidence percentages, priority scores) remain clean empty cells rather than zero, `NaN`, or fabricated estimates.
+  * Missing text metadata (department, semester, clean text, administrative reason) remain clean empty cells.
+* **Deterministic, Sanitized Filenames**:
+  * Generated with daily timestamps: `campusvoice_feedback_YYYY-MM-DD.csv` and `campusvoice_feedback_YYYY-MM-DD.xlsx`.
+  * Avoids embedding raw user queries or arbitrary inputs into filenames.
+* **Empty State & Disabled Controls**:
+  * When active filters yield zero matching records (`total === 0`), the export buttons are automatically disabled with accessible tooltip indications (`"No records to export"`).
+
+---
+
+## 7. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -199,7 +250,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 7. Development & Build Commands
+## 8. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -218,4 +269,5 @@ npm run build
 cd frontend
 npm run preview
 ```
+
 
