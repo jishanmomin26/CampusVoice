@@ -71,7 +71,44 @@ PostgreSQL Database
 
 ---
 
-## 3. Configuration & Environment Variables
+## 3. Step 9.6 — React Admin Dashboard Foundation
+
+In **Step 9.6**, the frontend introduces the first controlled version of the **Admin Dashboard**, providing high-level statistical intelligence without adding third-party charting or routing libraries.
+
+### Architecture & Navigation
+
+* **Portal View Navigation (`App.jsx`)**:
+  * An accessible tab-switcher allowing seamless navigation between:
+    * **Student Feedback**: Interactive feedback submission, ML analysis, and PostgreSQL persistence.
+    * **Admin Dashboard**: Live, database-backed aggregate feedback statistics and intelligence overview.
+  * No routing dependencies required; uses clean, lightweight state-driven tab switching.
+* **Dedicated Statistics API Service (`src/services/statsApi.js`)**:
+  * `getFeedbackStats()`: Communicates with `GET /api/v1/feedback/stats`.
+  * Defensively validates response fields (`total_feedback`, `analyzed_feedback`, `unclassified_feedback`, `sentiment`, `priority`, `categories`).
+  * Graceful error handling for network outages, HTTP 503, and HTTP 500 without leaking raw backend stack traces.
+* **Admin Dashboard Component (`src/components/AdminDashboard.jsx`)**:
+  * **Top-Level KPI Cards**:
+    * Total Submissions (`stats.total_feedback`)
+    * Analyzed Feedback (`stats.analyzed_feedback`)
+    * Unclassified Feedback (`stats.unclassified_feedback`)
+    * High Priority (`stats.priority.high`)
+  * **Sentiment Breakdown**:
+    * Positive, Neutral, Negative, and Unclassified counts with pure CSS progress meters.
+  * **Priority Tiers**:
+    * High, Medium, Low, and Unclassified urgency metrics with clear text labels and visual bars.
+  * **Dynamic Departmental & Topic Categories**:
+    * Dynamically iterates over `stats.categories` to display all active categories present in the database. Zero hardcoded category names.
+  * **Interactive Refresh**:
+    * Updates live statistics from PostgreSQL without reloading the browser page.
+  * **Error Resilience & Retry**:
+    * Displays friendly error alerts and a functional **Retry** button if the backend statistics service is unreachable.
+* **Responsive Layout (`src/components/AdminDashboard.css`)**:
+  * Desktop: 4-column KPI cards and side-by-side breakdown grids.
+  * Mobile (<640px): Stacks gracefully into single-column cards with zero horizontal overflow.
+
+---
+
+## 4. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -84,7 +121,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 4. Development & Build Commands
+## 5. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -103,3 +140,4 @@ npm run build
 cd frontend
 npm run preview
 ```
+

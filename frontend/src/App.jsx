@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import './App.css';
 import { analyzeAndSaveFeedback } from './services/analysisApi';
+import AdminDashboard from './components/AdminDashboard';
 
 function App() {
+  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'admin'
   const [feedbackText, setFeedbackText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -107,228 +109,270 @@ function App() {
       <header className="header">
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          Step 9.4 &bull; PostgreSQL Persistence Connected
+          {activeTab === 'student'
+            ? 'Step 9.6 \u2022 Student Feedback Portal'
+            : 'Step 9.6 \u2022 Admin Analytics Dashboard'}
         </div>
         <h1 className="title">CampusVoice</h1>
         <p className="subtitle">AI-Powered Student Feedback Intelligence & Prioritization System</p>
+
+        {/* View Navigation Tab Switcher */}
+        <nav className="view-nav" aria-label="Portal Navigation">
+          <div className="nav-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              id="tab-student"
+              aria-selected={activeTab === 'student'}
+              aria-controls="panel-student"
+              className={`nav-tab ${activeTab === 'student' ? 'active' : ''}`}
+              onClick={() => setActiveTab('student')}
+            >
+              Student Feedback
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-admin"
+              aria-selected={activeTab === 'admin'}
+              aria-controls="panel-admin"
+              className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin')}
+            >
+              Admin Dashboard
+            </button>
+          </div>
+        </nav>
       </header>
 
-      {/* Main Feedback Analysis Form */}
-      <section className="form-card" aria-label="Feedback Submission">
-        <form onSubmit={handleAnalyze}>
-          <div className="form-group">
-            <div className="label-row">
-              <label htmlFor="feedback-input" className="form-label">
-                Student Feedback Input
-              </label>
-              <span className="char-counter">{feedbackText.length} characters</span>
-            </div>
+      {/* Tab Panel: Student Feedback Portal */}
+      {activeTab === 'student' && (
+        <main id="panel-student" role="tabpanel" aria-labelledby="tab-student" className="tab-panel">
+          {/* Main Feedback Analysis Form */}
+          <section className="form-card" aria-label="Feedback Submission">
+            <form onSubmit={handleAnalyze}>
+              <div className="form-group">
+                <div className="label-row">
+                  <label htmlFor="feedback-input" className="form-label">
+                    Student Feedback Input
+                  </label>
+                  <span className="char-counter">{feedbackText.length} characters</span>
+                </div>
 
-            <textarea
-              id="feedback-input"
-              className="feedback-textarea"
-              rows={4}
-              placeholder="Enter student course, faculty, exam, or facility feedback here (e.g. 'The laboratory computers are outdated and the software is not working...')"
-              value={feedbackText}
-              onChange={(e) => {
-                setFeedbackText(e.target.value);
-                if (error) setError(null);
-              }}
-              disabled={loading}
-              aria-describedby={error ? "feedback-error" : undefined}
-            />
-          </div>
-
-          {/* Quick-fill Sample Suggestions */}
-          <div className="samples-bar">
-            <span className="samples-label">Quick test samples:</span>
-            <button
-              type="button"
-              className="sample-btn"
-              onClick={() => handleUseSample(sampleNegative)}
-              disabled={loading}
-            >
-              Needs Attention Sample
-            </button>
-            <button
-              type="button"
-              className="sample-btn"
-              onClick={() => handleUseSample(samplePositive)}
-              disabled={loading}
-            >
-              Positive Sample
-            </button>
-            {feedbackText && (
-              <button
-                type="button"
-                className="clear-btn"
-                onClick={handleClear}
-                disabled={loading}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          {/* Error Banner */}
-          {error && (
-            <div id="feedback-error" className="error-banner" role="alert">
-              <span className="error-icon" aria-hidden="true">&times;</span>
-              <span className="error-text">{error}</span>
-            </div>
-          )}
-
-          {/* Submit Action */}
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="analyze-btn"
-              disabled={loading || !feedbackText.trim()}
-              aria-busy={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="btn-spinner" aria-hidden="true"></span>
-                  <span>Saving &amp; analyzing feedback with ML pipeline...</span>
-                </>
-              ) : (
-                <span>Analyze Feedback</span>
-              )}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {/* Analysis Results & Persistence Section */}
-      {result && (
-        <section className="results-wrapper" aria-live="polite" aria-label="Feedback Intelligence Results">
-          {/* Step 9.4: Persistence Confirmation Section */}
-          {typeof result.id === 'number' && (
-            <div className="saved-confirmation" role="status" aria-live="polite">
-              <div className="saved-badge">
-                <span className="saved-icon" aria-hidden="true">&#10003;</span>
-                <span className="saved-title">Feedback Saved Successfully</span>
+                <textarea
+                  id="feedback-input"
+                  className="feedback-textarea"
+                  rows={4}
+                  placeholder="Enter student course, faculty, exam, or facility feedback here (e.g. 'The laboratory computers are outdated and the software is not working...')"
+                  value={feedbackText}
+                  onChange={(e) => {
+                    setFeedbackText(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  disabled={loading}
+                  aria-describedby={error ? "feedback-error" : undefined}
+                />
               </div>
-              <div className="saved-meta">
-                <span className="saved-id">
-                  <strong>Feedback ID:</strong> #{result.id}
-                </span>
-                {result.created_at && (
-                  <span className="saved-time">
-                    <strong>Submitted:</strong> {formatTimestamp(result.created_at)}
-                  </span>
+
+              {/* Quick-fill Sample Suggestions */}
+              <div className="samples-bar">
+                <span className="samples-label">Quick test samples:</span>
+                <button
+                  type="button"
+                  className="sample-btn"
+                  onClick={() => handleUseSample(sampleNegative)}
+                  disabled={loading}
+                >
+                  Needs Attention Sample
+                </button>
+                <button
+                  type="button"
+                  className="sample-btn"
+                  onClick={() => handleUseSample(samplePositive)}
+                  disabled={loading}
+                >
+                  Positive Sample
+                </button>
+                {feedbackText && (
+                  <button
+                    type="button"
+                    className="clear-btn"
+                    onClick={handleClear}
+                    disabled={loading}
+                  >
+                    Clear
+                  </button>
                 )}
               </div>
-            </div>
-          )}
 
-          <div className="results-header">
-            <h2 className="results-title">Feedback Intelligence Breakdown</h2>
-            <div className="models-tag">
-              Models: <span>{sentimentModel} (Sentiment)</span> &bull; <span>{categoryModel} (Category)</span>
-            </div>
-          </div>
+              {/* Error Banner */}
+              {error && (
+                <div id="feedback-error" className="error-banner" role="alert">
+                  <span className="error-icon" aria-hidden="true">&times;</span>
+                  <span className="error-text">{error}</span>
+                </div>
+              )}
 
-          <div className="results-grid">
-            {/* 1. Priority Assessment Card */}
-            <div className={`result-card priority-card ${getPriorityClass(priorityLevel)}`}>
-              <div className="card-header">
-                <span className="card-tag">Administrative Signal</span>
-                <span className={`priority-badge ${getPriorityClass(priorityLevel)}`}>
-                  Level: {priorityLevel ? priorityLevel.toUpperCase() : 'UNKNOWN'}
-                </span>
+              {/* Submit Action */}
+              <div className="form-actions">
+                <button
+                  type="submit"
+                  className="analyze-btn"
+                  disabled={loading || !feedbackText.trim()}
+                  aria-busy={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="btn-spinner" aria-hidden="true"></span>
+                      <span>Saving &amp; analyzing feedback with ML pipeline...</span>
+                    </>
+                  ) : (
+                    <span>Analyze Feedback</span>
+                  )}
+                </button>
               </div>
-              <h3 className="card-metric-title">Priority Assessment</h3>
-              <div className="score-display">
-                <span className="score-number">{priorityScore}</span>
-                <span className="score-total">/ 100</span>
-              </div>
-              <div className="score-bar-container" aria-hidden="true">
-                <div
-                  className={`score-bar-fill ${getPriorityClass(priorityLevel)}`}
-                  style={{ width: `${priorityScore}%` }}
-                ></div>
-              </div>
-              <p className="card-explanation">
-                <strong>Reason:</strong> {priorityReason || 'Deterministic assessment from confidence heuristics.'}
-              </p>
-            </div>
+            </form>
+          </section>
 
-            {/* 2. Sentiment Classification Card */}
-            <div className={`result-card sentiment-card ${getSentimentClass(sentimentName)}`}>
-              <div className="card-header">
-                <span className="card-tag">Sentiment Analysis</span>
-                <span className={`sentiment-badge ${getSentimentClass(sentimentName)}`}>
-                  {sentimentName ? sentimentName.toUpperCase() : 'UNKNOWN'}
-                </span>
-              </div>
-              <h3 className="card-metric-title">Detected Polarity</h3>
-              <div className="confidence-row">
-                <span className="confidence-label">Model Confidence:</span>
-                <span className="confidence-value">{formatPercent(sentimentConfidence)}</span>
-              </div>
-
-              {sentimentProbabilities && (
-                <div className="probabilities-block">
-                  <div className="prob-item">
-                    <span>Negative</span>
-                    <span>{formatPercent(sentimentProbabilities.negative)}</span>
+          {/* Analysis Results & Persistence Section */}
+          {result && (
+            <section className="results-wrapper" aria-live="polite" aria-label="Feedback Intelligence Results">
+              {/* Step 9.4: Persistence Confirmation Section */}
+              {typeof result.id === 'number' && (
+                <div className="saved-confirmation" role="status" aria-live="polite">
+                  <div className="saved-badge">
+                    <span className="saved-icon" aria-hidden="true">&#10003;</span>
+                    <span className="saved-title">Feedback Saved Successfully</span>
                   </div>
-                  <div className="prob-item">
-                    <span>Neutral</span>
-                    <span>{formatPercent(sentimentProbabilities.neutral)}</span>
-                  </div>
-                  <div className="prob-item">
-                    <span>Positive</span>
-                    <span>{formatPercent(sentimentProbabilities.positive)}</span>
+                  <div className="saved-meta">
+                    <span className="saved-id">
+                      <strong>Feedback ID:</strong> #{result.id}
+                    </span>
+                    {result.created_at && (
+                      <span className="saved-time">
+                        <strong>Submitted:</strong> {formatTimestamp(result.created_at)}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* 3. Category Classification Card */}
-            <div className="result-card category-card">
-              <div className="card-header">
-                <span className="card-tag">Topic Modeling</span>
-                <span className="category-badge">{categoryName || 'Unknown'}</span>
-              </div>
-              <h3 className="card-metric-title">Identified Category</h3>
-              <div className="confidence-row">
-                <span className="confidence-label">Model Confidence:</span>
-                <span className="confidence-value">{formatPercent(categoryConfidence)}</span>
+              <div className="results-header">
+                <h2 className="results-title">Feedback Intelligence Breakdown</h2>
+                <div className="models-tag">
+                  Models: <span>{sentimentModel} (Sentiment)</span> &bull; <span>{categoryModel} (Category)</span>
+                </div>
               </div>
 
-              {categoryProbabilities && (
-                <div className="probabilities-block">
-                  {Object.entries(categoryProbabilities)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 3)
-                    .map(([cat, prob]) => (
-                      <div key={cat} className="prob-item">
-                        <span className="prob-cat-name">{cat}</span>
-                        <span>{formatPercent(prob)}</span>
+              <div className="results-grid">
+                {/* 1. Priority Assessment Card */}
+                <div className={`result-card priority-card ${getPriorityClass(priorityLevel)}`}>
+                  <div className="card-header">
+                    <span className="card-tag">Administrative Signal</span>
+                    <span className={`priority-badge ${getPriorityClass(priorityLevel)}`}>
+                      Level: {priorityLevel ? priorityLevel.toUpperCase() : 'UNKNOWN'}
+                    </span>
+                  </div>
+                  <h3 className="card-metric-title">Priority Assessment</h3>
+                  <div className="score-display">
+                    <span className="score-number">{priorityScore}</span>
+                    <span className="score-total">/ 100</span>
+                  </div>
+                  <div className="score-bar-container" aria-hidden="true">
+                    <div
+                      className={`score-bar-fill ${getPriorityClass(priorityLevel)}`}
+                      style={{ width: `${priorityScore}%` }}
+                    ></div>
+                  </div>
+                  <p className="card-explanation">
+                    <strong>Reason:</strong> {priorityReason || 'Deterministic assessment from confidence heuristics.'}
+                  </p>
+                </div>
+
+                {/* 2. Sentiment Classification Card */}
+                <div className={`result-card sentiment-card ${getSentimentClass(sentimentName)}`}>
+                  <div className="card-header">
+                    <span className="card-tag">Sentiment Analysis</span>
+                    <span className={`sentiment-badge ${getSentimentClass(sentimentName)}`}>
+                      {sentimentName ? sentimentName.toUpperCase() : 'UNKNOWN'}
+                    </span>
+                  </div>
+                  <h3 className="card-metric-title">Detected Polarity</h3>
+                  <div className="confidence-row">
+                    <span className="confidence-label">Model Confidence:</span>
+                    <span className="confidence-value">{formatPercent(sentimentConfidence)}</span>
+                  </div>
+
+                  {sentimentProbabilities && (
+                    <div className="probabilities-block">
+                      <div className="prob-item">
+                        <span>Negative</span>
+                        <span>{formatPercent(sentimentProbabilities.negative)}</span>
                       </div>
-                    ))}
+                      <div className="prob-item">
+                        <span>Neutral</span>
+                        <span>{formatPercent(sentimentProbabilities.neutral)}</span>
+                      </div>
+                      <div className="prob-item">
+                        <span>Positive</span>
+                        <span>{formatPercent(sentimentProbabilities.positive)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* NLP Preprocessing & Negation Preservation Card */}
-          <div className="result-card preprocessing-card">
-            <div className="card-header">
-              <span className="card-tag">NLP Preprocessing & Negation</span>
-              <span className="nlp-badge">Step 3 &bull; spaCy + NLTK</span>
-            </div>
-            <h3 className="card-metric-title">Cleaned Normalized Text</h3>
-            <p className="cleaned-text-display">
-              <code>{cleanText || '(no tokens remaining)'}</code>
-            </p>
-            <p className="nlp-note">
-              Sentiment-critical negation terms (such as <em>not</em>, <em>no</em>, <em>never</em>) are strictly retained during stopword filtering to ensure accurate polarity inference.
-            </p>
-          </div>
-        </section>
+                {/* 3. Category Classification Card */}
+                <div className="result-card category-card">
+                  <div className="card-header">
+                    <span className="card-tag">Topic Modeling</span>
+                    <span className="category-badge">{categoryName || 'Unknown'}</span>
+                  </div>
+                  <h3 className="card-metric-title">Identified Category</h3>
+                  <div className="confidence-row">
+                    <span className="confidence-label">Model Confidence:</span>
+                    <span className="confidence-value">{formatPercent(categoryConfidence)}</span>
+                  </div>
+
+                  {categoryProbabilities && (
+                    <div className="probabilities-block">
+                      {Object.entries(categoryProbabilities)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 3)
+                        .map(([cat, prob]) => (
+                          <div key={cat} className="prob-item">
+                            <span className="prob-cat-name">{cat}</span>
+                            <span>{formatPercent(prob)}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* NLP Preprocessing & Negation Preservation Card */}
+              <div className="result-card preprocessing-card">
+                <div className="card-header">
+                  <span className="card-tag">NLP Preprocessing & Negation</span>
+                  <span className="nlp-badge">Step 3 &bull; spaCy + NLTK</span>
+                </div>
+                <h3 className="card-metric-title">Cleaned Normalized Text</h3>
+                <p className="cleaned-text-display">
+                  <code>{cleanText || '(no tokens remaining)'}</code>
+                </p>
+                <p className="nlp-note">
+                  Sentiment-critical negation terms (such as <em>not</em>, <em>no</em>, <em>never</em>) are strictly retained during stopword filtering to ensure accurate polarity inference.
+                </p>
+              </div>
+            </section>
+          )}
+        </main>
+      )}
+
+      {/* Tab Panel: Admin Dashboard */}
+      {activeTab === 'admin' && (
+        <main id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" className="tab-panel">
+          <AdminDashboard />
+        </main>
       )}
 
       {/* Footer */}
@@ -336,7 +380,7 @@ function App() {
         <div className="meta-footer">
           <span className="meta-item">React 18 + Vite</span>
           <span>&bull;</span>
-          <span className="meta-item">FastAPI REST Endpoint</span>
+          <span className="meta-item">FastAPI REST Endpoints</span>
           <span>&bull;</span>
           <span className="meta-item">PostgreSQL Persisted</span>
         </div>
