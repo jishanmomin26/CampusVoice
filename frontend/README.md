@@ -332,7 +332,58 @@ In **Step 9.13.2**, the React frontend transitions all authenticated HTTP commun
 
 ---
 
-## 9. Configuration & Environment Variables
+## 9. Step 9.14.2 — Admin User Management UI & Dashboard Integration
+
+In **Step 9.14.2**, the frontend introduces the **User Management UI** integrated cleanly into the **Admin Dashboard**, providing full administrative control over institutional user accounts, roles, and activation states.
+
+### Architecture & Components
+
+* **API Service Layer (`src/services/usersApi.js`)**:
+  * Fully integrated with centralized `apiClient.js` with Bearer token authentication and 401 session expiry handling.
+  * `getUsers(params)`: Encodes query parameters safely via `URLSearchParams` for `page`, `page_size`, `search`, `role`, and `is_active`.
+  * `getUser(userId)`: Fetches individual user record details by ID (`GET /api/v1/users/{user_id}`).
+  * `createUser(payload)`: Provisions student or admin user (`POST /api/v1/users`). Handles HTTP 409 conflict errors cleanly.
+  * `updateUser(userId, payload)`: Sends partial updates (`role`, `is_active`, optional `password`) via `PATCH /api/v1/users/{user_id}` using `apiClient.patch`.
+* **User Management Component (`src/components/UserManagement.jsx` & `UserManagement.css`)**:
+  * **Interactive Toolbar**:
+    * Username search box with 350ms debounced input and single-click clear button.
+    * Role filter dropdown (`All Roles`, `Admin`, `Student`).
+    * Status filter dropdown (`All Status`, `Active`, `Inactive`).
+    * "Clear Filters" action resetting query state back to page 1.
+  * **User Accounts Data Table**:
+    * Columns: `ID`, `Username`, `Role`, `Status`, `Created`, `Actions`.
+    * Color-coded status badges with glowing status indicator dots (`Active` vs `Inactive`).
+    * Role badges distinguishing `Admin` from `Student`.
+    * Formatted timestamps (`formatTimestamp`).
+  * **Self-Protection Safeguards**:
+    * Detects the authenticated administrator by ID and username comparison against `useAuth()`.
+    * Displays a prominent `(You)` badge next to the current admin's username in the table.
+    * Disables the "Deactivate" button on the admin's own row with a descriptive assistive tooltip (`"You cannot deactivate your own account."`).
+  * **Provision User Modal**:
+    * Semantic modal dialog with focus management, backdrop blur, and escape key handling.
+    * Fields: `Username` (required), `Password` (required, minimum 8 characters, password-masked), and `Role` (`student` or `admin`).
+    * Conflict handling: Displays user-friendly error banners on 409 Conflict (`"That username is already in use."`) without crashing or modal dismissal.
+  * **Edit User Modal**:
+    * Displays permanent `Username` in a disabled, read-only input with informative hint.
+    * Allows updating `Role` (`student` / `admin`) and `Account Status` (`Active` / `Inactive`).
+    * Prevents admins from setting their own status to Inactive.
+    * Optional password reset field (only sent when non-empty).
+  * **Deactivation Confirmation Dialog**:
+    * High-visibility danger dialog warning about immediate loss of account access while clarifying that historical student feedback remains safely preserved.
+    * Direct "Activate" button for fast re-activation of previously deactivated accounts.
+  * **Zero Sensitive Data Persistence**:
+    * Passwords are never stored in component state after modal closure, never logged to the browser console, and never saved in `localStorage` or `sessionStorage`.
+* **Dashboard Subnavigation (`src/components/AdminDashboard.jsx` & `AdminDashboard.css`)**:
+  * Introduces responsive `.admin-subnav` button group with distinct tabs:
+    * **Feedback Analytics**: KPI summary cards, interactive charts, and topic distributions.
+    * **Feedback Records**: Full tabular view of student feedback, advanced filtering, record detail modals, and CSV/Excel export.
+    * **User Management**: Administrative user provisioning, role assignments, and activation toggles.
+  * Only rendered when `isAdmin === true`; student accounts are strictly prevented from viewing administrative navigation.
+  * Seamless state switching without session loss or unnecessary page reloads.
+
+---
+
+## 10. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -345,7 +396,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 10. Development & Build Commands
+## 11. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell

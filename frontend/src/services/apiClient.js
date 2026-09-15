@@ -236,6 +236,10 @@ export const apiClient = {
     return apiRequest(path, { ...options, method: 'PUT', body });
   },
 
+  patch(path, body, options = {}) {
+    return apiRequest(path, { ...options, method: 'PATCH', body });
+  },
+
   delete(path, options = {}) {
     return apiRequest(path, { ...options, method: 'DELETE' });
   },

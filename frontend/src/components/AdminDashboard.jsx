@@ -6,19 +6,26 @@ import {
   CategoryChart,
 } from './DashboardCharts';
 import FeedbackRecords from './FeedbackRecords';
+import UserManagement from './UserManagement';
+import { useAuth } from '../context/AuthContext';
 import './AdminDashboard.css';
 
 /**
- * AdminDashboard Component (Step 9.6)
+ * AdminDashboard Component (Step 9.6 - Step 9.14.2)
  * 
  * Renders the foundation for the CampusVoice Admin Dashboard:
+ * - Subnavigation tabs: Feedback Analytics, Feedback Records, User Management
  * - High-level summary cards (Total, Analyzed, Unclassified, High Priority)
- * - Sentiment breakdown with accessible CSS meters
+ * - Sentiment breakdown with accessible CSS meters & Recharts
  * - Priority tiers breakdown
  * - Dynamically discovered category distribution (zero hardcoding)
+ * - Feedback records table with filtering, search, export, and detail view
+ * - User Management for provision, role assignment, and status control
  * - Interactive refresh capability and resilient error handling
  */
 export default function AdminDashboard() {
+  const { isAdmin } = useAuth();
+  const [activeSection, setActiveSection] = useState('analytics'); // 'analytics' | 'records' | 'users'
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,36 +104,85 @@ export default function AdminDashboard() {
       {/* Dashboard Top Bar */}
       <div className="dashboard-topbar">
         <div className="dashboard-intro">
-          <h2 className="dashboard-heading">Feedback Statistics &amp; Intelligence Overview</h2>
+          <h2 className="dashboard-heading">
+            {activeSection === 'analytics' && 'Feedback Statistics & Intelligence Overview'}
+            {activeSection === 'records' && 'Student Feedback Records & Export'}
+            {activeSection === 'users' && 'User Accounts & Access Management'}
+          </h2>
           <p className="dashboard-description">
-            Live, database-backed aggregations across all student feedback submissions and machine learning predictions.
+            {activeSection === 'analytics' && 'Live, database-backed aggregations across all student feedback submissions and machine learning predictions.'}
+            {activeSection === 'records' && 'Search, filter, inspect full analysis details, and export student feedback datasets.'}
+            {activeSection === 'users' && 'Provision student and administrator accounts, manage roles, and enforce security policies.'}
           </p>
         </div>
 
-        <div className="dashboard-actions">
-          {lastUpdated && (
-            <span className="last-updated-text">
-              Updated at {formatTime(lastUpdated)}
-            </span>
-          )}
-          <button
-            type="button"
-            className="refresh-btn"
-            onClick={handleRefresh}
-            disabled={loading || refreshing}
-            aria-label="Refresh feedback statistics"
-            aria-busy={refreshing}
-          >
-            <span className={`refresh-icon ${refreshing ? 'spinning' : ''}`} aria-hidden="true">
-              &#8635;
-            </span>
-            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-          </button>
-        </div>
+        {activeSection === 'analytics' && (
+          <div className="dashboard-actions">
+            {lastUpdated && (
+              <span className="last-updated-text">
+                Updated at {formatTime(lastUpdated)}
+              </span>
+            )}
+            <button
+              type="button"
+              className="refresh-btn"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              aria-label="Refresh feedback statistics"
+              aria-busy={refreshing}
+            >
+              <span className={`refresh-icon ${refreshing ? 'spinning' : ''}`} aria-hidden="true">
+                &#8635;
+              </span>
+              <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Error Alert State */}
-      {error && (
+      {/* Admin Subnav Navigation */}
+      <nav className="admin-subnav" aria-label="Admin Dashboard Sections">
+        <button
+          type="button"
+          id="subnav-analytics-btn"
+          className={`subnav-btn ${activeSection === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveSection('analytics')}
+          aria-current={activeSection === 'analytics' ? 'page' : undefined}
+        >
+          <span className="subnav-icon" aria-hidden="true">&#128202;</span>
+          <span>Feedback Analytics</span>
+        </button>
+
+        <button
+          type="button"
+          id="subnav-records-btn"
+          className={`subnav-btn ${activeSection === 'records' ? 'active' : ''}`}
+          onClick={() => setActiveSection('records')}
+          aria-current={activeSection === 'records' ? 'page' : undefined}
+        >
+          <span className="subnav-icon" aria-hidden="true">&#128221;</span>
+          <span>Feedback Records</span>
+        </button>
+
+        {isAdmin && (
+          <button
+            type="button"
+            id="subnav-users-btn"
+            className={`subnav-btn ${activeSection === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveSection('users')}
+            aria-current={activeSection === 'users' ? 'page' : undefined}
+          >
+            <span className="subnav-icon" aria-hidden="true">&#128101;</span>
+            <span>User Management</span>
+          </button>
+        )}
+      </nav>
+
+      {/* 1. Analytics Subview */}
+      {activeSection === 'analytics' && (
+        <>
+          {/* Error Alert State */}
+          {error && (
         <div className="dashboard-error-banner" role="alert">
           <div className="error-message-row">
             <span className="error-alert-icon" aria-hidden="true">&#9888;</span>
@@ -418,11 +474,20 @@ export default function AdminDashboard() {
             </>
           )}
           </section>
-
-          {/* 4. Feedback Records Management Table (Step 9.9) */}
-          <FeedbackRecords categories={stats?.categories} />
         </div>
       )}
-    </div>
-  );
+    </>
+  )}
+
+  {/* 2. Feedback Records Subview */}
+  {activeSection === 'records' && (
+    <FeedbackRecords categories={stats?.categories} />
+  )}
+
+  {/* 3. User Management Subview (Admin Only) */}
+  {activeSection === 'users' && isAdmin && (
+    <UserManagement />
+  )}
+</div>
+);
 }
