@@ -237,7 +237,54 @@ In **Step 9.11**, the Admin Dashboard adds comprehensive, client-side **CSV** an
 
 ---
 
-## 7. Configuration & Environment Variables
+## 7. Step 9.13.1 — Frontend Authentication Foundation & Role-Based Access Control
+
+In **Step 9.13.1**, the React frontend is enhanced with an accessible, production-grade authentication foundation and role-based access control (RBAC):
+
+### Architecture & Components
+
+* **Authentication API Service (`src/services/authApi.js`)**:
+  * `login(username, password)`: Submits credentials to `POST /api/v1/auth/login`. Handles 401 with a sanitized `"Invalid username or password."` error and returns signed JWT access token.
+  * `getCurrentUser(token)`: Queries `GET /api/v1/auth/me` using `Authorization: Bearer <token>` to retrieve the authenticated user profile (`id`, `username`, `role`, `is_active`, `created_at`).
+  * Reuses `VITE_API_BASE_URL` pattern with graceful network and server error handling.
+* **Centralized Token Storage (`src/utils/tokenStorage.js`)**:
+  * JWT access token is persisted in browser `localStorage` under the dedicated key:
+    `campusvoice_access_token`
+  * **Strict Credential Security**: User passwords are **never** stored in `localStorage`, `sessionStorage`, cookies, URL parameters, console logs, or persistent state.
+* **Authentication Context & Provider (`src/context/AuthContext.jsx`)**:
+  * Provides global `useAuth()` hook exposing:
+    * `user`: Current profile object or `null`.
+    * `token`: Stored JWT access token or `null`.
+    * `isAuthenticated`: Boolean (`Boolean(user && token)`).
+    * `isAdmin`: Boolean (`Boolean(user && user.role === 'admin')`).
+    * `isLoading`: Boolean (`true` during initial `/auth/me` verification).
+    * `login(username, password)`: Validates credentials, fetches profile, persists token.
+    * `logout()`: Clears token, resets auth state, and returns to Student view.
+  * **Session Restoration**: On application mount, `AuthContext` automatically checks `localStorage` for an existing token and calls `GET /api/v1/auth/me`. If valid, the user session is restored seamlessly; if expired or invalid, the token is cleanly purged.
+* **Login Page (`src/components/LoginPage.jsx` & `LoginPage.css`)**:
+  * Glassmorphic CampusVoice design language matching the main dashboard.
+  * Accessible `<form>` with associated labels, `autoComplete="username"` and `autoComplete="current-password"`, show/hide password toggle, and accessible error banners (`role="alert"`, `aria-live="polite"`).
+  * Safe, sanitized error messages preventing exposure of backend exceptions or stack traces.
+* **Role-Based Navigation & Access Control (`App.jsx`)**:
+  * **Unauthenticated Users**:
+    * Full access to Student Feedback submission, NLP preprocessing, and persistence.
+    * Navigation displays `"Student Feedback"` and `"Admin Sign In"` tabs.
+    * Accessing the Admin tab prompts the login interface.
+  * **Authenticated Admins (`role: "admin"`)**:
+    * Access to both `"Student Feedback"` and `"Admin Dashboard"` tabs.
+    * Header displays user badge (`admin (admin)`) and `"Sign Out"` action.
+    * API services (`statsApi.js` and `recordsApi.js`) automatically attach the Bearer token to backend requests.
+  * **Authenticated Students (`role: "student"`)**:
+    * Access to `"Student Feedback"`.
+    * `"Admin Dashboard"` tab is hidden from the navigation bar.
+    * If an administrative route is reached, a safe `"Admin Access Required"` warning is displayed with a button to return to the student portal.
+* **Logout Flow**:
+  * Invokes `logout()`, removing `campusvoice_access_token` from `localStorage`.
+  * Resets auth state and immediately returns to the Student Feedback view without requiring a full browser page refresh.
+
+---
+
+## 8. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -246,11 +293,11 @@ Copy `.env.example` to `.env` to override configuration:
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-> **Note**: Do not commit secrets or local credentials to Git.
+> **Security Note**: Never commit passwords, tokens, or local credentials to Git.
 
 ---
 
-## 8. Development & Build Commands
+## 9. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -269,5 +316,6 @@ npm run build
 cd frontend
 npm run preview
 ```
+
 
 

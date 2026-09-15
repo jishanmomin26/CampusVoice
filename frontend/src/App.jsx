@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import './App.css';
 import { analyzeAndSaveFeedback } from './services/analysisApi';
 import AdminDashboard from './components/AdminDashboard';
+import LoginPage from './components/LoginPage';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'admin'
+function AppContent() {
+  const { user, isAuthenticated, isAdmin, isLoading, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'admin' | 'login'
   const [feedbackText, setFeedbackText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,6 +15,11 @@ function App() {
 
   const sampleNegative = "The faculty is not helpful and the explanations are not clear at all.";
   const samplePositive = "The library has an excellent collection of reference books and quiet study areas.";
+
+  const handleLogout = () => {
+    logout();
+    setActiveTab('student');
+  };
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
@@ -110,37 +118,82 @@ function App() {
         <div className="status-badge">
           <span className="pulse-dot"></span>
           {activeTab === 'student'
-            ? 'Step 9.6 \u2022 Student Feedback Portal'
-            : 'Step 9.6 \u2022 Admin Analytics Dashboard'}
+            ? 'CampusVoice \u2022 Student Feedback Portal'
+            : activeTab === 'login'
+            ? 'CampusVoice \u2022 Administrator Sign In'
+            : isAuthenticated && isAdmin
+            ? 'CampusVoice \u2022 Admin Analytics Dashboard'
+            : 'CampusVoice \u2022 Administrator Portal'}
         </div>
         <h1 className="title">CampusVoice</h1>
         <p className="subtitle">AI-Powered Student Feedback Intelligence & Prioritization System</p>
 
         {/* View Navigation Tab Switcher */}
         <nav className="view-nav" aria-label="Portal Navigation">
-          <div className="nav-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              id="tab-student"
-              aria-selected={activeTab === 'student'}
-              aria-controls="panel-student"
-              className={`nav-tab ${activeTab === 'student' ? 'active' : ''}`}
-              onClick={() => setActiveTab('student')}
-            >
-              Student Feedback
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="tab-admin"
-              aria-selected={activeTab === 'admin'}
-              aria-controls="panel-admin"
-              className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveTab('admin')}
-            >
-              Admin Dashboard
-            </button>
+          <div className="nav-container">
+            <div className="nav-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                id="tab-student"
+                aria-selected={activeTab === 'student'}
+                aria-controls="panel-student"
+                className={`nav-tab ${activeTab === 'student' ? 'active' : ''}`}
+                onClick={() => setActiveTab('student')}
+              >
+                Student Feedback
+              </button>
+
+              {/* If Authenticated Admin: show Admin Dashboard tab */}
+              {isAuthenticated && isAdmin && (
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-admin"
+                  aria-selected={activeTab === 'admin'}
+                  aria-controls="panel-admin"
+                  className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('admin')}
+                >
+                  Admin Dashboard
+                </button>
+              )}
+
+              {/* If Unauthenticated: show Admin Sign In tab */}
+              {!isAuthenticated && (
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-login"
+                  aria-selected={activeTab === 'login' || activeTab === 'admin'}
+                  aria-controls="panel-login"
+                  className={`nav-tab ${activeTab === 'login' || activeTab === 'admin' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('login')}
+                >
+                  Admin Sign In
+                </button>
+              )}
+            </div>
+
+            {/* Authenticated user pill badge and Sign Out button */}
+            {isAuthenticated && (
+              <div className="auth-user-bar">
+                <span className={`user-badge ${isAdmin ? 'badge-admin' : 'badge-student'}`}>
+                  <span className="user-dot"></span>
+                  <span className="user-name">{user?.username}</span>
+                  <span className="user-role-label">({user?.role})</span>
+                </span>
+                <button
+                  type="button"
+                  id="nav-logout-btn"
+                  className="nav-logout-btn"
+                  onClick={handleLogout}
+                  title="Sign out of your account"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </nav>
       </header>
@@ -368,10 +421,71 @@ function App() {
         </main>
       )}
 
+      {/* Tab Panel: Login Page */}
+      {activeTab === 'login' && !isAuthenticated && (
+        <main id="panel-login" role="tabpanel" aria-labelledby="tab-login" className="tab-panel">
+          <LoginPage
+            onSuccess={(userProfile) => {
+              if (userProfile?.role === 'admin') {
+                setActiveTab('admin');
+              } else {
+                setActiveTab('student');
+              }
+            }}
+            onCancel={() => setActiveTab('student')}
+          />
+        </main>
+      )}
+
       {/* Tab Panel: Admin Dashboard */}
       {activeTab === 'admin' && (
         <main id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" className="tab-panel">
-          <AdminDashboard />
+          {isLoading ? (
+            <div className="auth-checking-state">
+              <span className="auth-checking-spinner" aria-hidden="true"></span>
+              <p>Verifying administrator session...</p>
+            </div>
+          ) : !isAuthenticated ? (
+            <LoginPage
+              onSuccess={(userProfile) => {
+                if (userProfile?.role === 'admin') {
+                  setActiveTab('admin');
+                } else {
+                  setActiveTab('student');
+                }
+              }}
+              onCancel={() => setActiveTab('student')}
+            />
+          ) : !isAdmin ? (
+            <div className="admin-denied-container">
+              <div className="admin-denied-card">
+                <div className="denied-icon" aria-hidden="true">&#128274;</div>
+                <h2 className="denied-title">Admin Access Required</h2>
+                <p className="denied-message">
+                  Your account (<strong>{user?.username}</strong>) has the <strong>{user?.role}</strong> role.
+                  Administrative privileges are strictly required to view student feedback intelligence analytics and records.
+                </p>
+                <div className="denied-actions">
+                  <button
+                    type="button"
+                    className="denied-return-btn"
+                    onClick={() => setActiveTab('student')}
+                  >
+                    Return to Student Portal
+                  </button>
+                  <button
+                    type="button"
+                    className="denied-logout-btn"
+                    onClick={handleLogout}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <AdminDashboard />
+          )}
         </main>
       )}
 
@@ -389,4 +503,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}

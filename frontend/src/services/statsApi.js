@@ -5,26 +5,41 @@
  * - GET /api/v1/feedback/stats
  */
 
+import { getStoredToken } from '../utils/tokenStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 /**
  * Fetches database-backed feedback statistics from the backend for the Admin Dashboard.
  * 
+ * @param {string} [tokenOverride] - Optional JWT token override.
  * @returns {Promise<Object>} Structured statistics object matching FeedbackStatsResponse contract.
  * @throws {Error} User-friendly error message on failure.
  */
-export async function getFeedbackStats() {
+export async function getFeedbackStats(tokenOverride = null) {
   const endpoint = `${API_BASE_URL}/api/v1/feedback/stats`;
+  const token = tokenOverride || getStoredToken();
+
+  const headers = {
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
 
   try {
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Administrative authentication required (HTTP 401). Please sign in.');
+      }
+
+      if (response.status === 403) {
+        throw new Error('Access denied (HTTP 403). Administrator privileges are required.');
+      }
+
       if (response.status === 503) {
         throw new Error('Database statistics service is temporarily unavailable. Please try again later.');
       }

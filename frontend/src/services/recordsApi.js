@@ -5,6 +5,8 @@
  * - GET /api/v1/feedback/records
  */
 
+import { getStoredToken } from '../utils/tokenStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 /**
@@ -17,6 +19,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000
  * @param {string} [options.sentiment] - Filter by sentiment ('positive', 'neutral', 'negative').
  * @param {string} [options.category] - Dynamic category filter.
  * @param {string} [options.priority] - Filter by priority tier ('high', 'medium', 'low').
+ * @param {string} [options.token] - Optional JWT bearer token override.
  * @returns {Promise<Object>} Object matching FeedbackRecordsResponse schema ({ items, total, page, page_size, total_pages }).
  * @throws {Error} User-friendly error message on failure.
  */
@@ -27,6 +30,7 @@ export async function getFeedbackRecords({
   sentiment,
   category,
   priority,
+  token: tokenOverride,
 } = {}) {
   const params = new URLSearchParams();
 
@@ -56,16 +60,27 @@ export async function getFeedbackRecords({
 
   const queryString = params.toString();
   const endpoint = `${API_BASE_URL}/api/v1/feedback/records${queryString ? `?${queryString}` : ''}`;
+  const token = tokenOverride || getStoredToken();
+
+  const headers = {
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
 
   try {
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Administrative authentication required (HTTP 401). Please sign in.');
+      }
+
+      if (response.status === 403) {
+        throw new Error('Access denied (HTTP 403). Administrator privileges are required.');
+      }
       if (response.status === 422) {
         let message = 'Invalid filter or pagination parameters provided.';
         try {
