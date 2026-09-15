@@ -29,9 +29,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.main import app
+from app.api.dependencies import require_admin
 from app.db.base import Base
 from app.db.session import get_db
 from app.models.feedback import Feedback
+from app.models.user import User
 from app.services.feedback_stats_service import get_feedback_statistics
 
 
@@ -250,6 +252,13 @@ class TestFeedbackStatisticsServiceLogic:
 
 class TestFeedbackStatisticsAPIEndpoint:
     """Validates HTTP contract, response schema validation, and error handling."""
+
+    @pytest.fixture(autouse=True)
+    def setup_admin_override(self):
+        mock_admin = User(id=1, username="admin", role="admin", is_active=True)
+        app.dependency_overrides[require_admin] = lambda: mock_admin
+        yield
+        app.dependency_overrides.pop(require_admin, None)
 
     def test_get_feedback_stats_returns_200_and_valid_schema(self, client, in_memory_db):
         """Condition 8: GET /api/v1/feedback/stats returns HTTP 200 with complete valid schema."""

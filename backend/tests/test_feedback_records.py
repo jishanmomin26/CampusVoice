@@ -46,9 +46,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.main import app
+from app.api.dependencies import require_admin
 from app.db.base import Base
 from app.db.session import get_db
 from app.models.feedback import Feedback
+from app.models.user import User
 from app.services.feedback_records_service import get_feedback_records
 
 
@@ -419,6 +421,7 @@ class TestFeedbackRecordsAPIEndpoint:
         """Scenario 22: GET /api/v1/feedback/records returns HTTP 200 with complete validated schema."""
         _seed_sample_records(in_memory_db)
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             response = client.get("/api/v1/feedback/records?page=1&page_size=10")
             assert response.status_code == 200
@@ -452,6 +455,7 @@ class TestFeedbackRecordsAPIEndpoint:
         """Validates query parameters via HTTP GET."""
         _seed_sample_records(in_memory_db)
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             # Search
             res = client.get("/api/v1/feedback/records?search=calculus")
@@ -485,6 +489,7 @@ class TestFeedbackRecordsAPIEndpoint:
     def test_endpoint_invalid_sentiment_returns_422(self, client, in_memory_db):
         """Scenario 14 (HTTP): Invalid sentiment query param returns HTTP 422."""
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             response = client.get("/api/v1/feedback/records?sentiment=unknown")
             assert response.status_code == 422
@@ -495,6 +500,7 @@ class TestFeedbackRecordsAPIEndpoint:
     def test_endpoint_invalid_priority_returns_422(self, client, in_memory_db):
         """Scenario 15 (HTTP): Invalid priority query param returns HTTP 422."""
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             response = client.get("/api/v1/feedback/records?priority=urgent")
             assert response.status_code == 422
@@ -505,6 +511,7 @@ class TestFeedbackRecordsAPIEndpoint:
     def test_condition_26_invalid_pagination_bounds_return_422(self, client, in_memory_db):
         """Scenario 26: page < 1, page_size < 1, or page_size > 100 returns HTTP 422 via FastAPI validation."""
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             res_page = client.get("/api/v1/feedback/records?page=0")
             assert res_page.status_code == 422
@@ -520,6 +527,7 @@ class TestFeedbackRecordsAPIEndpoint:
     def test_condition_24_database_failure_returns_safe_500(self, client, in_memory_db):
         """Scenario 24: SQLAlchemyError triggers HTTP 500 without leaking stack traces."""
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             with patch(
                 "app.api.v1.endpoints.feedback.get_feedback_records",
@@ -552,6 +560,7 @@ class TestExistingEndpointsRegression:
         """GET /api/v1/feedback/stats remains functional alongside GET /records."""
         _seed_sample_records(in_memory_db)
         app.dependency_overrides[get_db] = lambda: in_memory_db
+        app.dependency_overrides[require_admin] = lambda: User(id=1, username="admin", role="admin", is_active=True)
         try:
             response = client.get("/api/v1/feedback/stats")
             assert response.status_code == 200

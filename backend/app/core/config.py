@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     # Allowed frontend CORS origin URL
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # JWT Authentication Settings (Step 9.12)
+    JWT_SECRET_KEY: str = (
+        "campusvoice-dev-secret-key-change-in-production-min-32-chars-long"
+    )
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Local Development Admin Seed Settings (Optional)
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str | None = None
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def sanitize_database_url(cls, v: str) -> str:

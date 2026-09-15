@@ -25,8 +25,10 @@ def _ensure_project_root_in_path() -> Path:
 _ensure_project_root_in_path()
 
 from ml.pipeline.feedback_intelligence import analyze_feedback
+from app.api.dependencies import require_admin
 from app.db.session import get_db
 from app.models.feedback import Feedback
+from app.models.user import User
 from app.schemas.feedback import (
     FeedbackAnalyzeAndSaveRequest,
     FeedbackCreate,
@@ -176,6 +178,7 @@ def analyze_and_save_feedback(
     ),
 )
 def get_feedback_stats(
+    current_admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> FeedbackStatsResponse:
     """Retrieve aggregate feedback statistics from PostgreSQL."""
@@ -222,6 +225,7 @@ def get_feedback_records_endpoint(
     sentiment: Optional[str] = Query(default=None, description="Sentiment filter (positive, neutral, negative)"),
     category: Optional[str] = Query(default=None, description="Category filter (dynamic, case-insensitive)"),
     priority: Optional[str] = Query(default=None, description="Priority filter (high, medium, low)"),
+    current_admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> FeedbackRecordsResponse:
     """Retrieve paginated and filtered feedback records from PostgreSQL."""

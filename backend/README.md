@@ -469,30 +469,36 @@ backend/
 ├── app/
 │   ├── api/
 │   │   ├── __init__.py
+│   │   ├── dependencies.py             # Auth dependencies: get_current_user, require_admin
 │   │   └── v1/
 │   │       ├── __init__.py
 │   │       └── endpoints/
 │   │           ├── __init__.py
+│   │           ├── auth.py             # Authentication endpoints: /login, /me
 │   │           ├── health.py
 │   │           ├── feedback.py         # Stats, records, submit, list, and analyze-and-save endpoints
 │   │           ├── analysis.py         # In-memory analysis & priority endpoint
 │   │           └── nlp.py              # NLP test endpoint
 │   ├── core/
 │   │   ├── __init__.py
-│   │   └── config.py
+│   │   ├── config.py                   # App settings, JWT & Admin credentials
+│   │   ├── roles.py                    # UserRole enum: admin, student
+│   │   └── security.py                 # Bcrypt hashing & PyJWT token management
 │   ├── db/
 │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   └── session.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── feedback.py                 # Extended Feedback model with analysis fields
+│   │   ├── feedback.py                 # Feedback model with analysis fields
+│   │   └── user.py                     # User model (id, username, password_hash, role, is_active)
 │   ├── nlp/                            # NLP processing module
 │   │   ├── __init__.py
 │   │   ├── preprocessing.py            # Normalization, tokenization, lemmatization
 │   │   └── resources.py                # NLTK & spaCy resource management
 │   ├── schemas/
 │   │   ├── __init__.py
+│   │   ├── auth.py                     # LoginRequest, TokenResponse, CurrentUserResponse
 │   │   ├── feedback.py                 # FeedbackCreate, FeedbackResponse, Stats, and Records schemas
 │   │   ├── analysis.py                 # Feedback analysis Pydantic schemas
 │   │   └── nlp.py                      # Preprocessing request & result schemas
@@ -503,9 +509,12 @@ backend/
 │   │   └── feedback_records_service.py # Database records retrieval, filtering & pagination service
 │   ├── __init__.py
 │   └── main.py
+├── scripts/
+│   └── seed_admin.py                   # Local development admin user provisioning
 ├── tests/
 │   ├── __init__.py
 │   ├── test_analysis_endpoint.py       # Analysis API endpoint test suite (18 tests)
+│   ├── test_auth.py                    # Auth & RBAC test suite (28 tests)
 │   ├── test_feedback_persistence.py    # Feedback persistence test suite (14 tests)
 │   ├── test_feedback_records.py        # Feedback records API test suite (32 tests)
 │   ├── test_feedback_stats.py          # Feedback statistics test suite (9 tests)
@@ -513,7 +522,8 @@ backend/
 ├── alembic/
 │   ├── versions/
 │   │   ├── 001_create_feedback_table.py
-│   │   └── 002_add_analysis_fields_to_feedback.py
+│   │   ├── 002_add_analysis_fields_to_feedback.py
+│   │   └── 003_create_users_table.py
 │   ├── env.py
 │   └── script.py.mako
 ├── alembic.ini
@@ -522,4 +532,68 @@ backend/
 ├── .env                                (local, gitignored)
 └── README.md
 ```
+
+---
+
+## 15. Authentication & Role-Based Access Control (RBAC) (Step 9.12)
+
+Step 9.12 establishes a secure, backend-enforced authentication system and role-based access control (RBAC) protecting sensitive administrative routes while ensuring uninterrupted student access.
+
+### 15.1 Role Definitions
+* **`admin`**: Full administrative access to student feedback statistics (`GET /api/v1/feedback/stats`), filtered and paginated records (`GET /api/v1/feedback/records`), and user profile verification (`GET /api/v1/auth/me`).
+* **`student`**: Unauthenticated public feedback submission and intelligence analysis. Can authenticate if provisioned, but has no access to admin dashboard analytics or record lists (receives `HTTP 403 Forbidden`).
+
+### 15.2 Security Architecture
+* **Password Hashing**: Salted bcrypt (`bcrypt>=4.1.0`) with work factor 12. Plaintext passwords are never logged, transmitted in error messages, or stored in the database.
+* **Token Standard**: Signed HMAC-SHA256 (HS256) JSON Web Tokens (`PyJWT>=2.8.0`) containing subject `sub` (user ID), `username`, `role`, and expiration (`exp`).
+* **Protected Routes Dependency**: FastApi `Depends(require_admin)` extracts and validates the Bearer token from the `Authorization: Bearer <token>` header, checks user active status, and verifies that `user.role == UserRole.ADMIN.value`.
+* **Zero Disruption to Student Ingestion**: Public student submission routes (`POST /api/v1/feedback`, `POST /api/v1/feedback/analyze-and-save`, `POST /api/v1/feedback/analyze`) remain completely unauthenticated.
+
+### 15.3 Authentication Endpoints
+
+#### POST /api/v1/auth/login
+Authenticates credentials and returns a Bearer access token.
+
+* **Request Body**:
+  ```json
+  {
+    "username": "admin",
+    "password": "YourSecurePassword123"
+  }
+  ```
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "token_type": "bearer",
+    "role": "admin",
+    "username": "admin"
+  }
+  ```
+
+#### GET /api/v1/auth/me
+Returns current authenticated user profile without exposing password hashes.
+
+* **Headers**: `Authorization: Bearer <token>`
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "id": 1,
+    "username": "admin",
+    "role": "admin",
+    "is_active": true,
+    "created_at": "2026-09-15T11:44:56.894443+05:30"
+  }
+  ```
+
+### 15.4 Local Admin Seeding Script
+To create an initial development administrator account:
+
+```powershell
+$env:ADMIN_USERNAME="admin"
+$env:ADMIN_PASSWORD="YourDevelopmentPassword123"
+python scripts/seed_admin.py
+```
+The script is fully idempotent: if the user already exists, it prints an informational notice and exits safely without modifying the account.
+
 
