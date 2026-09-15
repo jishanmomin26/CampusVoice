@@ -493,7 +493,130 @@ cd frontend
 npm run preview
 ```
 
+### Run Automated Frontend Tests (Vitest)
+```powershell
+cd frontend
+# Single CI test run
+npm run test:run
 
+# Interactive watch mode
+npm test
 
+# Test coverage analysis
+npm run test:coverage
+```
 
+---
 
+## 13. Step 9.16.1 — Frontend Automated Testing Foundation
+
+In **Step 9.16.1**, an enterprise-grade automated testing foundation was introduced for the React frontend, utilizing **Vitest**, **React Testing Library**, **JSDOM**, and **V8 Coverage**. The testing setup is completely isolated from the production Vite pipeline (`vite.config.js`), ensuring zero bundle size overhead, zero production chunk changes, and total preservation of existing code-splitting performance.
+
+### Testing Stack
+
+- **Test Runner & Harness**: [Vitest v2.1.8](https://vitest.dev/) (fast, native ESM runner compatible with Vite 5)
+- **DOM Environment**: [jsdom v29.1.1](https://github.com/jsdom/jsdom)
+- **Component Testing**: [@testing-library/react v16.3.3](https://testing-library.com/docs/react-testing-library/intro/)
+- **User Interaction Simulation**: [@testing-library/user-event v14.6.7](https://testing-library.com/docs/user-event/intro/)
+- **Custom DOM Matchers**: [@testing-library/jest-dom v7.0.1](https://github.com/testing-library/jest-dom)
+- **Coverage Engine**: [@vitest/coverage-v8 v2.1.8](https://vitest.dev/guide/coverage.html)
+
+### Configuration Architecture
+
+1. **`vitest.config.js`**:
+   - Independent test configuration file defining `test.globals: true`, `test.environment: 'jsdom'`, and `test.setupFiles: ['./src/test/setup.js']`.
+   - Production build (`vite.config.js`) remains untouched and unaware of testing infrastructure.
+2. **`src/test/setup.js`**:
+   - Imports `@testing-library/jest-dom/vitest` for rich assertions (`toBeInTheDocument`, `toHaveValue`, etc.).
+   - Resets DOM body, clears `localStorage`, `sessionStorage`, and all mocks in `afterEach`.
+   - Provides global browser environment shims: `ResizeObserver` (for Recharts responsive containers), `window.matchMedia`, `URL.createObjectURL`, and `URL.revokeObjectURL`.
+
+### Test Suite Organization
+
+The test suite contains **15 test files** across **99 passing tests**:
+
+```text
+frontend/src/
+├── test/
+│   └── setup.js                          # Global test environment & browser mocks
+├── utils/__tests__/
+│   ├── tokenStorage.test.js              # Token read, write, remove, expiry, validation (9 tests)
+│   └── exportFeedback.test.js            # CSV escaping, sanitization, dynamic XLSX import (12 tests)
+├── services/__tests__/
+│   ├── apiClient.test.js                 # Headers, Bearer injection, timeout, 401 throttle (16 tests)
+│   ├── authApi.test.js                   # Login API, /me profile fetching (3 tests)
+│   ├── analysisApi.test.js               # Submission & analysis service methods (4 tests)
+│   ├── statsApi.test.js                  # Analytics metrics endpoint handling (3 tests)
+│   ├── recordsApi.test.js                # Query building, filters, pagination, details (5 tests)
+│   └── usersApi.test.js                  # User CRUD operations & admin endpoints (9 tests)
+├── context/__tests__/
+│   └── AuthContext.test.jsx              # Auth provider, login, logout, session expiration (10 tests)
+├── components/__tests__/
+│   ├── LoginPage.test.jsx                # Form rendering, validation, submit, password toggle (6 tests)
+│   ├── ErrorBoundary.test.jsx            # Error trapping, safe fallback card, retry handler (3 tests)
+│   ├── LazyLoading.test.jsx              # Suspense fallbacks, accessible spinner (3 tests)
+│   ├── FeedbackRecords.test.jsx          # Table render, search/filter, error state, detail modal (5 tests)
+│   └── UserManagement.test.jsx           # User table, create/edit modals, conflict alerts (6 tests)
+└── __tests__/
+    └── App.test.jsx                      # Top-level portal, RBAC navigation tabs, session banner (5 tests)
+```
+
+### Covered Workflows & Scenarios
+
+1. **Authentication & Token Storage**:
+   - Storing, retrieving, clearing JWT tokens in `localStorage`.
+   - Handling invalid tokens, non-string values, and storage quota exceptions gracefully.
+   - Centralized 401 interception: token clearing and broadcast throttling to prevent notification spam.
+2. **Context & State Management (`AuthContext`)**:
+   - Initial hydration from stored token with `/me` profile validation.
+   - Login mutation, error propagation, and role flag synchronization (`isAdmin`).
+   - Clean logout wiping stored tokens and session state.
+   - Session expiration event handling and alert banner toggling.
+3. **Data Export (`exportFeedback`)**:
+   - CSV header generation, date formatting, CSV formula injection neutralization (`=`, `+`, `-`, `@`).
+   - Dynamic `import('xlsx')` execution verifying SheetJS is strictly loaded on demand.
+4. **Interactive Component Workflows**:
+   - `LoginPage`: Accessible inputs, required field alerts, submit payload trimming, credential error displays.
+   - `UserManagement`: Self-protection rules (disabling deactivation and role demotion for current admin), create user modal with 409 conflict handling, edit user modal with password preservation.
+   - `FeedbackRecords`: Table sorting, multi-attribute filtering, pagination bounds, detail modal launch.
+   - `ErrorBoundary` & `LazyFallback`: Safe chunk failure trapping and accessible loading states.
+5. **Portal RBAC & Navigation (`App.jsx`)**:
+   - Public student feedback submission form and confirmation banner.
+   - Unauthenticated visitors seeing only the "Admin Sign In" tab.
+   - Authenticated student accounts restricted from administrative navigation.
+   - Authenticated administrators granted access to the Admin Dashboard.
+
+### Measured Coverage Results (`npm run test:coverage`)
+
+```text
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   65.88 |    69.54 |   59.12 |   65.88 |                   
+ src               |   42.46 |    27.27 |   14.28 |   42.46 |                   
+  App.jsx          |   42.46 |    27.27 |   14.28 |   42.46 | ...52-463,468-522 
+ src/components    |    58.3 |    63.32 |   53.65 |    58.3 |                   
+  ...Dashboard.jsx |       0 |        0 |       0 |       0 | 1-510             
+  ...ardCharts.jsx |       0 |        0 |       0 |       0 | 1-298             
+  ...rBoundary.jsx |   95.65 |       90 |     100 |   95.65 | 24-25             
+  ...ordDetail.jsx |   90.76 |       28 |   71.42 |   90.76 | ...1,77-78,83,134 
+  ...ckRecords.jsx |    83.4 |     61.9 |      45 |    83.4 | ...04,465-471,500 
+  LazyFallback.jsx |     100 |      100 |     100 |     100 |                   
+  LoginPage.jsx    |     100 |     93.1 |     100 |     100 | 50,129            
+  ...anagement.jsx |    85.6 |    62.96 |    43.9 |    85.6 | ...22-824,895-898 
+ src/context       |     100 |      100 |     100 |     100 |                   
+  AuthContext.jsx  |     100 |      100 |     100 |     100 |                   
+ src/services      |   89.06 |    79.87 |     100 |   89.06 |                   
+  analysisApi.js   |   69.23 |    72.41 |     100 |   69.23 | ...53-154,158-165 
+  apiClient.js     |   95.34 |    81.63 |     100 |   95.34 | ...75,205-207,216 
+  authApi.js       |   83.05 |    44.44 |     100 |   83.05 | ...43,57-58,66-67 
+  recordsApi.js    |     100 |    85.29 |     100 |     100 | 60,105-107,110    
+  statsApi.js      |     100 |      100 |     100 |     100 |                   
+  usersApi.js      |   90.78 |    81.25 |     100 |   90.78 | ...39-140,154-155 
+ src/utils         |   96.94 |    86.15 |     100 |   96.94 |                   
+  ...rtFeedback.js |   96.98 |    84.61 |     100 |   96.98 | ...02,172,225-226 
+  tokenStorage.js  |   96.82 |     92.3 |     100 |   96.82 | 51-52             
+-------------------|---------|----------|---------|---------|-------------------
+Test Files: 15 passed (15)
+Tests:      99 passed (99)
+```
