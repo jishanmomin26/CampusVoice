@@ -383,7 +383,84 @@ In **Step 9.14.2**, the frontend introduces the **User Management UI** integrate
 
 ---
 
-## 10. Configuration & Environment Variables
+## 10. Step 9.15.1 — Initial Bundle Optimization & Code Splitting
+
+In **Step 9.15.1**, the React frontend architecture was optimized through component-level code splitting and on-demand dynamic imports, reducing the initial JavaScript payload by **81.1%** without altering any UI behavior, API contracts, or existing features.
+
+### Architecture & Optimization Strategy
+
+```text
+                                Initial Page Load
+                          (Student Feedback Submission)
+                                        ↓
+                       Initial Bundle: ~168 kB (53 kB gzip)
+                     [App.jsx, Analysis Form, AuthContext]
+                                        ↓
+       ┌────────────────────────────────┼────────────────────────────────┐
+       ↓                                ↓                                ↓
+Admin Sign-In                Feedback Records View            Export to Excel
+(Dynamic React.lazy)         (Dynamic React.lazy)             (Dynamic import('xlsx'))
+       ↓                                ↓                                ↓
+AdminDashboard.js (~14 kB)   FeedbackRecords.js (~16 kB)      xlsx.js (~429 kB)
+DashboardCharts.js (~383 kB) FeedbackRecordDetail.js (~6 kB)  (Strictly on click)
+UserManagement.js (~20 kB)
+```
+
+1. **On-Demand Dynamic Module Import (`src/utils/exportFeedback.js`)**:
+   - Removed static `import * as XLSX from 'xlsx'` from the top-level bundle.
+   - `exportFeedbackToExcel(records, customFilename)` is now an asynchronous function using runtime dynamic import (`const XLSX = await import('xlsx')`).
+   - The heavy SheetJS library (~429 kB) is completely isolated and never downloaded during initial student or admin page loads.
+   - Lightweight CSV export (`exportFeedbackToCSV`) remains synchronous and 100% dependency-free with zero XLSX overhead.
+
+2. **Hierarchical Code Splitting with `React.lazy()` & `Suspense`**:
+   - **`App.jsx`**: Lazy-loads `<AdminDashboard />`. Unauthenticated visitors and students never download administrative code.
+   - **`AdminDashboard.jsx`**: Lazy-loads subviews and heavy modules:
+     - `DashboardCharts` (`SentimentChart`, `PriorityChart`, `CategoryChart` powered by Recharts).
+     - `FeedbackRecords` (Data table and filter toolbar).
+     - `UserManagement` (User provisioning and administration).
+   - **`FeedbackRecords.jsx`**: Lazy-loads the `<FeedbackRecordDetail />` modal dialog, fetched only when an administrator inspects an individual record.
+
+3. **Resilient Error Boundaries & Accessible Fallbacks**:
+   - **`ErrorBoundary` (`src/components/ErrorBoundary.jsx`)**:
+     - Class component implementing `getDerivedStateFromError` and `componentDidCatch`.
+     - Catches lazy chunk resolution failures (e.g. intermittent network drops) and renders a user-friendly error card with a "Retry Loading" button without exposing raw stack traces.
+   - **`LazyFallback` (`src/components/LazyFallback.jsx`)**:
+     - Accessible loading indicator utilizing `role="status"` and `aria-live="polite"`.
+     - Pure CSS animated spinner matching the CampusVoice dark-glassmorphism design aesthetic.
+
+### Measured Bundle Performance Metrics
+
+Exact production build numbers measured via `npm run build` (Vite v5.4.21):
+
+| Metric | Pre-Optimization (Baseline) | Post-Optimization (Step 9.15.1) | Reduction / Change |
+| :--- | :--- | :--- | :--- |
+| **Initial JS (`index.js`)** | `888.48 kB` | **`168.29 kB`** | **-720.19 kB (-81.06%)** |
+| **Initial JS (gzip)** | `269.59 kB` | **`53.24 kB`** | **-216.35 kB (-80.25%)** |
+| **Initial CSS (`index.css`)** | `61.54 kB` | **`22.31 kB`** | **-39.23 kB (-63.75%)** |
+| **Initial CSS (gzip)** | `11.13 kB` | **`4.89 kB`** | **-6.24 kB (-56.06%)** |
+| **Vite Chunk Warnings** | `(!) > 500 kB chunk warning` | **0 warnings (all chunks < 500 kB)** | **Fully Resolved** |
+
+#### Production Chunk Breakdown (`dist/assets/`)
+
+| Chunk File | Uncompressed Size | Gzip Payload | Loading Trigger |
+| :--- | :--- | :--- | :--- |
+| `index-v5G1hBlA.js` | 168.29 kB | 53.24 kB | **Initial Page Load** |
+| `index-CmEM-P9v.css` | 22.31 kB | 4.89 kB | **Initial Page Load** |
+| `AdminDashboard-CfvLDj9l.js` | 14.12 kB | 3.09 kB | On Admin Sign-In |
+| `AdminDashboard-Dki5AkBm.css` | 9.99 kB | 2.42 kB | On Admin Sign-In |
+| `DashboardCharts-Cm4vxQzA.js` | 383.06 kB | 111.18 kB | On Analytics Subview View (Recharts) |
+| `DashboardCharts-BKgSF9dR.css` | 1.68 kB | 0.70 kB | On Analytics Subview View |
+| `FeedbackRecords-CS6wmoTe.js` | 16.66 kB | 4.92 kB | On Feedback Records Tab Click |
+| `FeedbackRecords-0DF2AcFS.css` | 12.43 kB | 3.08 kB | On Feedback Records Tab Click |
+| `FeedbackRecordDetail-0IkvwSt8.js`| 6.24 kB | 1.41 kB | On Record "View Details" Click |
+| `FeedbackRecordDetail-F5Z1wXlp.css`| 4.82 kB | 1.47 kB | On Record "View Details" Click |
+| `UserManagement-B1CuvMbW.js` | 20.57 kB | 5.24 kB | On User Management Tab Click |
+| `UserManagement-CfNsJlUW.css` | 12.43 kB | 2.93 kB | On User Management Tab Click |
+| `xlsx-D_0l8YDs.js` | 429.03 kB | 143.08 kB | **Only on "Export Excel" button click** |
+
+---
+
+## 11. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -396,7 +473,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 11. Development & Build Commands
+## 12. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -415,6 +492,7 @@ npm run build
 cd frontend
 npm run preview
 ```
+
 
 
 

@@ -5,12 +5,10 @@
  * for feedback intelligence records.
  * 
  * - RFC 4180 compliant CSV formatting with UTF-8 BOM
- * - Real .xlsx workbook generation using SheetJS (xlsx)
+ * - Real .xlsx workbook generation using dynamically loaded SheetJS (xlsx)
  * - Safe NULL handling for legacy / unclassified records
  * - Sanitized, deterministic filenames
  */
-
-import * as XLSX from 'xlsx';
 
 /**
  * Generates a clean, sanitized export filename.
@@ -207,16 +205,24 @@ export function exportFeedbackToCSV(records, customFilename) {
 }
 
 /**
- * Exports feedback records to a downloadable Excel (.xlsx) file using SheetJS.
+ * Exports feedback records to a downloadable Excel (.xlsx) file using dynamically imported SheetJS.
+ * The heavy xlsx library is only downloaded when the user invokes this function.
  * 
  * @param {Array<Object>} records - Array of feedback record items
  * @param {string} [customFilename] - Optional custom filename
- * @returns {string} Downloaded filename
- * @throws {Error} If records array is empty or undefined
+ * @returns {Promise<string>} Downloaded filename
+ * @throws {Error} If records array is empty or undefined, or if module loading fails
  */
-export function exportFeedbackToExcel(records, customFilename) {
+export async function exportFeedbackToExcel(records, customFilename) {
   if (!records || !Array.isArray(records) || records.length === 0) {
     throw new Error('No records to export.');
+  }
+
+  let XLSX;
+  try {
+    XLSX = await import('xlsx');
+  } catch (err) {
+    throw new Error('Unable to load Excel export engine. Please check your connection and try again.');
   }
 
   const filename = customFilename || generateExportFilename('xlsx');

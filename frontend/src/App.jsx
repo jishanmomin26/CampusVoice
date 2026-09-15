@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import './App.css';
 import { analyzeAndSaveFeedback } from './services/analysisApi';
-import AdminDashboard from './components/AdminDashboard';
 import LoginPage from './components/LoginPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import LazyFallback from './components/LazyFallback';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
+// Code splitting: Lazy-load Admin Dashboard (Step 9.15.1)
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 
 function AppContent() {
   const { user, isAuthenticated, isAdmin, isLoading, sessionExpired, clearSessionExpired, logout } = useAuth();
@@ -506,7 +510,14 @@ function AppContent() {
               </div>
             </div>
           ) : (
-            <AdminDashboard />
+            <ErrorBoundary
+              fallbackTitle="Unable to Load Admin Dashboard"
+              fallbackDescription="A network or loading issue occurred while loading the Admin Dashboard. Please check your connection and try again."
+            >
+              <Suspense fallback={<LazyFallback message="Loading Admin Dashboard..." minHeight="360px" />}>
+                <AdminDashboard />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </main>
       )}

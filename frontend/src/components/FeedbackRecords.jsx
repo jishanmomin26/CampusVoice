@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { getFeedbackRecords, fetchAllMatchingFeedbackRecords } from '../services/recordsApi';
 import { exportFeedbackToCSV, exportFeedbackToExcel } from '../utils/exportFeedback';
-import FeedbackRecordDetail from './FeedbackRecordDetail';
+import LazyFallback from './LazyFallback';
 import './FeedbackRecords.css';
+
+// Lazy-loaded detailed record inspection modal (Step 9.15.1)
+const FeedbackRecordDetail = lazy(() => import('./FeedbackRecordDetail'));
 
 /**
  * FeedbackRecords Component (Step 9.9)
@@ -165,7 +168,7 @@ export default function FeedbackRecords({ categories }) {
       if (type === 'csv') {
         exportFeedbackToCSV(allMatchingRecords);
       } else if (type === 'excel') {
-        exportFeedbackToExcel(allMatchingRecords);
+        await exportFeedbackToExcel(allMatchingRecords);
       }
     } catch (err) {
       setExportError(err.message || `Failed to export records to ${type.toUpperCase()}. Please try again.`);
@@ -584,12 +587,14 @@ export default function FeedbackRecords({ categories }) {
         </div>
       </div>
 
-      {/* Detail Modal View (Step 9.10) */}
+      {/* Detail Modal View (Step 9.10, Lazy loaded Step 9.15.1) */}
       {selectedRecord && (
-        <FeedbackRecordDetail
-          record={selectedRecord}
-          onClose={() => setSelectedRecord(null)}
-        />
+        <Suspense fallback={<LazyFallback message="Loading record details..." minHeight="200px" />}>
+          <FeedbackRecordDetail
+            record={selectedRecord}
+            onClose={() => setSelectedRecord(null)}
+          />
+        </Suspense>
       )}
     </section>
   );

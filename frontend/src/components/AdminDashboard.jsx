@@ -1,14 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { getFeedbackStats } from '../services/statsApi';
-import {
-  SentimentChart,
-  PriorityChart,
-  CategoryChart,
-} from './DashboardCharts';
-import FeedbackRecords from './FeedbackRecords';
-import UserManagement from './UserManagement';
 import { useAuth } from '../context/AuthContext';
+import LazyFallback from './LazyFallback';
 import './AdminDashboard.css';
+
+// Code splitting: Lazy-loaded subviews & charting dependencies (Step 9.15.1)
+const SentimentChart = lazy(() =>
+  import('./DashboardCharts').then((m) => ({ default: m.SentimentChart }))
+);
+const PriorityChart = lazy(() =>
+  import('./DashboardCharts').then((m) => ({ default: m.PriorityChart }))
+);
+const CategoryChart = lazy(() =>
+  import('./DashboardCharts').then((m) => ({ default: m.CategoryChart }))
+);
+const FeedbackRecords = lazy(() => import('./FeedbackRecords'));
+const UserManagement = lazy(() => import('./UserManagement'));
 
 /**
  * AdminDashboard Component (Step 9.6 - Step 9.14.2)
@@ -273,8 +280,10 @@ export default function AdminDashboard() {
                 <span className="breakdown-subtitle">Model-classified polarity breakdown</span>
               </div>
 
-              {/* Step 9.7: Sentiment Donut Chart */}
-              <SentimentChart sentiment={sentiment} total={total} />
+              {/* Step 9.7: Sentiment Donut Chart (Lazy loaded Step 9.15.1) */}
+              <Suspense fallback={<LazyFallback message="Loading sentiment visualization..." minHeight="240px" />}>
+                <SentimentChart sentiment={sentiment} total={total} />
+              </Suspense>
 
               <div className="stats-list">
                 {/* Positive */}
@@ -354,8 +363,10 @@ export default function AdminDashboard() {
                 <span className="breakdown-subtitle">Deterministic urgency distribution</span>
               </div>
 
-              {/* Step 9.7: Priority Bar Chart */}
-              <PriorityChart priority={priority} total={total} />
+              {/* Step 9.7: Priority Bar Chart (Lazy loaded Step 9.15.1) */}
+              <Suspense fallback={<LazyFallback message="Loading priority tiers..." minHeight="240px" />}>
+                <PriorityChart priority={priority} total={total} />
+              </Suspense>
 
               <div className="stats-list">
                 {/* High */}
@@ -449,8 +460,10 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <>
-                {/* Step 9.7: Dynamic Category Horizontal Bar Chart */}
-                <CategoryChart categories={categories} total={total} />
+                {/* Step 9.7: Dynamic Category Horizontal Bar Chart (Lazy loaded Step 9.15.1) */}
+                <Suspense fallback={<LazyFallback message="Loading category breakdown..." minHeight="240px" />}>
+                  <CategoryChart categories={categories} total={total} />
+                </Suspense>
 
                 <div className="categories-grid">
                 {categoryEntries.map(([catName, count]) => (
@@ -479,14 +492,18 @@ export default function AdminDashboard() {
     </>
   )}
 
-  {/* 2. Feedback Records Subview */}
+  {/* 2. Feedback Records Subview (Lazy loaded Step 9.15.1) */}
   {activeSection === 'records' && (
-    <FeedbackRecords categories={stats?.categories} />
+    <Suspense fallback={<LazyFallback message="Loading feedback records management..." minHeight="400px" />}>
+      <FeedbackRecords categories={stats?.categories} />
+    </Suspense>
   )}
 
-  {/* 3. User Management Subview (Admin Only) */}
+  {/* 3. User Management Subview (Admin Only, Lazy loaded Step 9.15.1) */}
   {activeSection === 'users' && isAdmin && (
-    <UserManagement />
+    <Suspense fallback={<LazyFallback message="Loading user management console..." minHeight="400px" />}>
+      <UserManagement />
+    </Suspense>
   )}
 </div>
 );

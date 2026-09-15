@@ -1022,3 +1022,120 @@
   }
 }
 
+/* ==========================================================================
+   Code Splitting: Lazy Loading & Error Boundary Styles (Step 9.15.1)
+   ========================================================================== */
+
+.lazy-loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 3rem 1.5rem;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.lazy-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 2.5rem;
+  background: var(--card-bg, rgba(15, 23, 42, 0.65));
+  border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.lazy-loading-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #818cf8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.lazy-loading-text {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #94a3b8);
+  font-weight: 500;
+  margin: 0;
+}
+
+.lazy-error-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 2.5rem 1.5rem;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.lazy-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 460px;
+  padding: 2rem 2.5rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-align: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.lazy-error-icon {
+  font-size: 2rem;
+  color: #f87171;
+  line-height: 1;
+}
+
+.lazy-error-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.lazy-error-description {
+  font-size: 0.88rem;
+  color: #fca5a5;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.lazy-error-actions {
+  margin-top: 0.5rem;
+}
+
+.lazy-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.25rem;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fee2e2;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lazy-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+}
+
+
