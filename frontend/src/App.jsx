@@ -6,15 +6,19 @@ import LoginPage from './components/LoginPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function AppContent() {
-  const { user, isAuthenticated, isAdmin, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, isLoading, sessionExpired, clearSessionExpired, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('student'); // 'student' | 'admin' | 'login'
   const [feedbackText, setFeedbackText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
-  const sampleNegative = "The faculty is not helpful and the explanations are not clear at all.";
-  const samplePositive = "The library has an excellent collection of reference books and quiet study areas.";
+  // If session expires while in admin view, transition safely to student portal
+  React.useEffect(() => {
+    if (sessionExpired && activeTab === 'admin') {
+      setActiveTab('student');
+    }
+  }, [sessionExpired, activeTab]);
 
   const handleLogout = () => {
     logout();
@@ -113,6 +117,24 @@ function AppContent() {
 
   return (
     <div className="container">
+      {/* Session Expired Notification Banner (Step 9.13.2) */}
+      {sessionExpired && (
+        <div role="alert" aria-live="polite" className="session-expired-banner">
+          <span className="session-expired-icon" aria-hidden="true">&#9888;</span>
+          <span className="session-expired-text">
+            Your session has expired. Please sign in again.
+          </span>
+          <button
+            type="button"
+            className="session-expired-dismiss"
+            onClick={clearSessionExpired}
+            aria-label="Dismiss session expiration alert"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="header">
         <div className="status-badge">

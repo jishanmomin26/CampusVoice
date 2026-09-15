@@ -1,22 +1,38 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as apiLogin, getCurrentUser as apiGetCurrentUser } from '../services/authApi';
+import { onUnauthorized } from '../services/apiClient';
 import { getStoredToken, setStoredToken, removeStoredToken } from '../utils/tokenStorage';
 
 const AuthContext = createContext(null);
 
 /**
- * Authentication Provider Component (Step 9.13.1)
+ * Authentication Provider Component (Step 9.13.1 & 9.13.2)
  * 
  * Manages global authentication state, token persistence, and role-based permissions:
  * - Automatically restores user session from localStorage on application startup.
  * - Handles login credential validation and JWT storage.
- * - Manages clean session termination upon logout.
+ * - Manages clean session termination upon logout or 401 session expiration.
  * - Strictly avoids storing plaintext passwords.
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  // Subscribe to centralized 401 Unauthorized session expiration events
+  useEffect(() => {
+    const unsubscribe = onUnauthorized((_error) => {
+      // Clear authenticated state cleanly without direct React manipulation from API layer
+      setToken(null);
+      setUser(null);
+      setSessionExpired(true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Restore session from localStorage on initial mount
   useEffect(() => {
@@ -80,11 +96,19 @@ export function AuthProvider({ children }) {
     // 3. Persist token to localStorage
     setStoredToken(accessToken);
 
-    // 4. Update auth state
+    // 4. Update auth state and reset sessionExpired flag
     setToken(accessToken);
     setUser(userProfile);
+    setSessionExpired(false);
 
     return userProfile;
+  }, []);
+
+  /**
+   * Clears the sessionExpired flag once acknowledged by the UI.
+   */
+  const clearSessionExpired = useCallback(() => {
+    setSessionExpired(false);
   }, []);
 
   /**
@@ -94,6 +118,7 @@ export function AuthProvider({ children }) {
     removeStoredToken();
     setToken(null);
     setUser(null);
+    setSessionExpired(false);
   }, []);
 
   const value = {
@@ -102,6 +127,8 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user && token),
     isAdmin: Boolean(user && user.role === 'admin'),
     isLoading,
+    sessionExpired,
+    clearSessionExpired,
     login,
     logout,
   };

@@ -284,7 +284,55 @@ In **Step 9.13.1**, the React frontend is enhanced with an accessible, productio
 
 ---
 
-## 8. Configuration & Environment Variables
+## 8. Step 9.13.2 — Centralized Authenticated API & Session Handling
+
+In **Step 9.13.2**, the React frontend transitions all authenticated HTTP communication to a robust, centralized API client layer (`src/services/apiClient.js`) that enforces consistent Bearer token injection, structured error classification, export safety, and concurrency-safe 401 session expiration handling.
+
+### Architecture & Key Capabilities
+
+* **Centralized API Client (`src/services/apiClient.js`)**:
+  * Uniform wrapper around native `fetch` supporting `get`, `post`, `put`, and `delete`.
+  * Automatically inspects `localStorage` via `getStoredToken()` and injects `Authorization: Bearer <token>` into outgoing requests when available.
+  * Explicit token override support via `{ token }` option for pre-storage bootstrap verification (e.g., initial `/auth/me` check during login).
+  * Automatically attaches `Content-Type: application/json` for request bodies.
+  * Structured error classification via `ApiError` class with convenience boolean flags:
+    * `isAuthError` (`status === 401`)
+    * `isForbidden` (`status === 403`)
+    * `isValidationError` (`status === 422`)
+    * `isServerError` (`status >= 500`)
+    * `isNetworkError` (`status === 0` / fetch network failure)
+* **Automatic 401 Session Expiry & Non-Circular Decoupling**:
+  * **Subscriber Pattern (`onUnauthorized`)**: `apiClient.js` maintains a set of unauthorized listeners without importing `AuthContext` or React hooks, completely avoiding circular dependency cycles.
+  * When any protected endpoint responds with HTTP 401:
+    1. Immediately purges the expired JWT from `localStorage` via `removeStoredToken()`.
+    2. Notifies registered subscribers via `notifyUnauthorized()`.
+    3. Throws an `ApiError(401)` preventing further consumer processing.
+  * **AuthContext Subscription**: On mount, `AuthContext` registers a listener with `onUnauthorized(handleUnauthorized)`. Upon notification, it:
+    * Resets user state to `null`.
+    * Clears token state to `null`.
+    * Sets `sessionExpired: true`.
+  * **Auto-Navigation & Expiry Alert (`App.jsx`)**:
+    * If `sessionExpired` is triggered while viewing the Admin Dashboard, the UI automatically transitions the active tab back to `"student"`.
+    * An accessible, dismissible alert banner appears at the top of the Student Portal: `"Your session has expired. Please sign in again."`.
+  * **Concurrency Protection**: An internal `isHandlingUnauthorized` mutex prevents multiple parallel 401 responses from triggering redundant storage clears, duplicate listener invocations, or navigation thrashing.
+  * **No Blind 401 Retries**: Once a request encounters a 401, no automatic retries are executed; the request fails immediately and cleanly.
+  * **Login Isolation (`skipAuthHandler: true`)**: The `login()` method passes `skipAuthHandler: true`, ensuring invalid credentials display an inline login error without triggering global session-expired handlers.
+* **Service Layer Refactoring**:
+  * **`statsApi.js`**: Refactored to use `apiClient.get('/api/v1/feedback/stats')`, preserving defensive validation and translating errors into friendly UI messages.
+  * **`recordsApi.js`**: Refactored to use `apiClient.get('/api/v1/feedback/records?...')`.
+  * **`authApi.js`**: Refactored `login()` and `getCurrentUser()` to use `apiClient`.
+* **Export Safety During Session Invalidation**:
+  * In `recordsApi.js` (`fetchAllMatchingFeedbackRecords`), sequential page fetches are executed with `apiClient.get`.
+  * If a 401 occurs at any point during a multi-page fetch:
+    * An `ApiError(401)` is thrown immediately.
+    * Pagination is halted and zero further page requests are dispatched.
+    * Generation of partial or corrupt CSV/Excel files is completely prevented.
+* **Preservation of Public Student Feedback**:
+  * Feedback submission functions (`analyzeAndSaveFeedback` and `analyzeFeedback` in `src/services/analysisApi.js`) remain public and unauthenticated, using standalone HTTP requests without Bearer token requirements or 401 side effects.
+
+---
+
+## 9. Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to override configuration:
 
@@ -297,7 +345,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 9. Development & Build Commands
+## 10. Development & Build Commands
 
 ### Start Vite Development Server
 ```powershell
@@ -316,6 +364,7 @@ npm run build
 cd frontend
 npm run preview
 ```
+
 
 
 

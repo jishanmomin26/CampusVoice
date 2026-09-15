@@ -312,6 +312,63 @@
   border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Session Expired Notification Banner (Step 9.13.2) */
+.session-expired-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 800px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  color: #fca5a5;
+  font-size: 0.9rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: slideDown 0.25s ease-out;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.12);
+}
+
+.session-expired-icon {
+  color: #ef4444;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.session-expired-text {
+  flex: 1;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.session-expired-dismiss {
+  background: transparent;
+  border: none;
+  color: #fca5a5;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.session-expired-dismiss:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+}
+
+.session-expired-dismiss:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 1px;
+}
+
 .tab-panel {
   width: 100%;
   animation: fadeIn 0.25s ease-out;

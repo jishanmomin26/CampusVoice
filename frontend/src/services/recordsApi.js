@@ -5,9 +5,7 @@
  * - GET /api/v1/feedback/records
  */
 
-import { getStoredToken } from '../utils/tokenStorage';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+import { apiClient } from './apiClient';
 
 /**
  * Fetches paginated, filtered feedback records from the PostgreSQL database.
@@ -59,79 +57,24 @@ export async function getFeedbackRecords({
   }
 
   const queryString = params.toString();
-  const endpoint = `${API_BASE_URL}/api/v1/feedback/records${queryString ? `?${queryString}` : ''}`;
-  const token = tokenOverride || getStoredToken();
+  const path = `/api/v1/feedback/records${queryString ? `?${queryString}` : ''}`;
+  const options = tokenOverride ? { token: tokenOverride } : {};
 
-  const headers = {
-    'Accept': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-  };
+  const data = await apiClient.get(path, options);
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Administrative authentication required (HTTP 401). Please sign in.');
-      }
-
-      if (response.status === 403) {
-        throw new Error('Access denied (HTTP 403). Administrator privileges are required.');
-      }
-      if (response.status === 422) {
-        let message = 'Invalid filter or pagination parameters provided.';
-        try {
-          const errBody = await response.json();
-          if (errBody.detail) {
-            if (typeof errBody.detail === 'string') {
-              message = errBody.detail;
-            } else if (Array.isArray(errBody.detail) && errBody.detail[0]?.msg) {
-              message = errBody.detail[0].msg;
-            }
-          }
-        } catch {
-          // Fall back to friendly default
-        }
-        throw new Error(message);
-      }
-
-      if (response.status === 503) {
-        throw new Error('Feedback records service is temporarily unavailable. Please try again later.');
-      }
-
-      if (response.status >= 500) {
-        throw new Error('An unexpected server error occurred while retrieving feedback records. Please try again.');
-      }
-
-      throw new Error(`Unable to load feedback records (HTTP ${response.status}). Please try again.`);
-    }
-
-    const data = await response.json();
-
-    // Defensive validation of expected response structure
-    if (
-      !data ||
-      !Array.isArray(data.items) ||
-      typeof data.total !== 'number' ||
-      typeof data.page !== 'number' ||
-      typeof data.page_size !== 'number' ||
-      typeof data.total_pages !== 'number'
-    ) {
-      throw new Error('Received an unexpected response structure from the feedback records service.');
-    }
-
-    return data;
-  } catch (err) {
-    if (err.name === 'TypeError' && err.message.includes('fetch')) {
-      throw new Error(
-        `Unable to connect to the CampusVoice records service. Please ensure the backend server is running at ${API_BASE_URL}`
-      );
-    }
-    throw err;
+  // Defensive validation of expected response structure
+  if (
+    !data ||
+    !Array.isArray(data.items) ||
+    typeof data.total !== 'number' ||
+    typeof data.page !== 'number' ||
+    typeof data.page_size !== 'number' ||
+    typeof data.total_pages !== 'number'
+  ) {
+    throw new Error('Received an unexpected response structure from the feedback records service.');
   }
+
+  return data;
 }
 
 /**
