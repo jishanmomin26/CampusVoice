@@ -475,6 +475,7 @@ backend/
 │   │       └── endpoints/
 │   │           ├── __init__.py
 │   │           ├── auth.py             # Authentication endpoints: /login, /me
+│   │           ├── users.py            # User management endpoints: list, get, create, update
 │   │           ├── health.py
 │   │           ├── feedback.py         # Stats, records, submit, list, and analyze-and-save endpoints
 │   │           ├── analysis.py         # In-memory analysis & priority endpoint
@@ -499,6 +500,7 @@ backend/
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── auth.py                     # LoginRequest, TokenResponse, CurrentUserResponse
+│   │   ├── users.py                    # UserListItem, UserListResponse, UserCreateRequest, UserUpdateRequest, UserDetailResponse
 │   │   ├── feedback.py                 # FeedbackCreate, FeedbackResponse, Stats, and Records schemas
 │   │   ├── analysis.py                 # Feedback analysis Pydantic schemas
 │   │   └── nlp.py                      # Preprocessing request & result schemas
@@ -506,7 +508,8 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── feedback_service.py         # Database persistence service
 │   │   ├── feedback_stats_service.py   # Database statistics aggregation service
-│   │   └── feedback_records_service.py # Database records retrieval, filtering & pagination service
+│   │   ├── feedback_records_service.py # Database records retrieval, filtering & pagination service
+│   │   └── user_service.py             # User listing, creation, updating, and deactivation service
 │   ├── __init__.py
 │   └── main.py
 ├── scripts/
@@ -515,6 +518,7 @@ backend/
 │   ├── __init__.py
 │   ├── test_analysis_endpoint.py       # Analysis API endpoint test suite (18 tests)
 │   ├── test_auth.py                    # Auth & RBAC test suite (28 tests)
+│   ├── test_user_management.py         # User management API test suite (38 tests)
 │   ├── test_feedback_persistence.py    # Feedback persistence test suite (14 tests)
 │   ├── test_feedback_records.py        # Feedback records API test suite (32 tests)
 │   ├── test_feedback_stats.py          # Feedback statistics test suite (9 tests)
@@ -595,5 +599,127 @@ $env:ADMIN_PASSWORD="YourDevelopmentPassword123"
 python scripts/seed_admin.py
 ```
 The script is fully idempotent: if the user already exists, it prints an informational notice and exits safely without modifying the account.
+
+---
+
+## 16. User Management API (Step 9.14.1)
+
+In **Step 9.14.1**, the backend introduces a dedicated, admin-only REST API (`/api/v1/users`) for managing user accounts, roles, active statuses, and credentials.
+
+### 16.1 Architecture & Security Rules
+
+* **Admin Authorization**: All endpoints enforce `Depends(require_admin)`. Students receive `HTTP 403 Forbidden`, and unauthenticated callers receive `HTTP 401 Unauthorized`.
+* **No Physical Deletion**: User accounts are never physically removed via SQL `DELETE`. Deactivation is represented by `is_active = false`, preserving historical audit integrity.
+* **Self-Protection**: Administrators cannot deactivate their own account (`HTTP 400 Bad Request`).
+* **Last Active Admin Protection**: The system prevents deactivating or demoting the last active administrator (`HTTP 409 Conflict`), safeguarding against irreversible administrative lockout.
+* **Stable Usernames**: Usernames cannot be modified after account creation.
+* **Response Privacy**: Neither plaintext passwords nor one-way `password_hash` values are ever exposed in any response schema.
+* **Database-Level Operations**: User listings, search, filtering, and counting are executed directly in PostgreSQL via SQLAlchemy 2.x expressions without loading the full table into memory.
+
+### 16.2 Endpoints
+
+#### 1. GET /api/v1/users
+Retrieves a paginated list of users with optional filtering and search.
+
+* **Query Parameters**:
+  * `page` (integer, default: `1`, minimum: `1`): 1-indexed page number.
+  * `page_size` (integer, default: `20`, minimum: `1`, maximum: `100`): Items per page.
+  * `search` (string, optional): Case-insensitive keyword search on `username`.
+  * `role` (string, optional): Filter by `admin` or `student`.
+  * `is_active` (boolean, optional): Filter by `true` or `false`.
+* **Ordering**: `created_at DESC`, `id DESC`.
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "items": [
+      {
+        "id": 2,
+        "username": "student_jane",
+        "role": "student",
+        "is_active": true,
+        "created_at": "2026-09-15T12:59:34.123456+05:30"
+      },
+      {
+        "id": 1,
+        "username": "admin",
+        "role": "admin",
+        "is_active": true,
+        "created_at": "2026-09-15T11:44:56.894443+05:30"
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 2,
+    "total_pages": 1
+  }
+  ```
+
+#### 2. GET /api/v1/users/{user_id}
+Retrieves safe details for an individual user account.
+
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "id": 1,
+    "username": "admin",
+    "role": "admin",
+    "is_active": true,
+    "created_at": "2026-09-15T11:44:56.894443+05:30"
+  }
+  ```
+* **Errors**: `HTTP 404 Not Found` if the user ID does not exist.
+
+#### 3. POST /api/v1/users
+Creates a new user account with salted bcrypt password hashing.
+
+* **Request Body**:
+  ```json
+  {
+    "username": "student_john",
+    "password": "SecurePassword123!",
+    "role": "student"
+  }
+  ```
+* **Validation**:
+  * `username`: 1-100 characters, whitespace-trimmed, case-insensitive uniqueness.
+  * `password`: Minimum 8 characters, maximum 72 bytes.
+  * `role`: `student` (default) or `admin`.
+* **Response (HTTP 201 Created)**:
+  ```json
+  {
+    "id": 3,
+    "username": "student_john",
+    "role": "student",
+    "is_active": true,
+    "created_at": "2026-09-15T19:30:00.000000+05:30"
+  }
+  ```
+* **Errors**: `HTTP 409 Conflict` if the username already exists; `HTTP 422` if validation fails.
+
+#### 4. PATCH /api/v1/users/{user_id}
+Updates user attributes (role, active status, or password).
+
+* **Request Body** (at least one field required):
+  ```json
+  {
+    "role": "admin",
+    "is_active": false,
+    "password": "NewSecurePassword456!"
+  }
+  ```
+* **Response (HTTP 200 OK)**:
+  ```json
+  {
+    "id": 3,
+    "username": "student_john",
+    "role": "admin",
+    "is_active": false,
+    "created_at": "2026-09-15T19:30:00.000000+05:30"
+  }
+  ```
+* **Safeguard Errors**:
+  * `HTTP 400 Bad Request`: When an admin attempts to set `is_active: false` on their own ID.
+  * `HTTP 409 Conflict`: When attempting to deactivate or demote the last active admin account in the database.
+
 
 
