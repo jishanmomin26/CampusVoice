@@ -620,3 +620,36 @@ All files          |   65.88 |    69.54 |   59.12 |   65.88 |
 Test Files: 15 passed (15)
 Tests:      99 passed (99)
 ```
+
+---
+
+## 14. Step 9.17 — Security Hardening & Session Protection
+
+In **Step 9.17**, the frontend authentication, session management, and data handling workflows were hardened against session corruption, credential leakage, and concurrency race conditions.
+
+### 1. Token Storage & Lifecycle Hygiene
+- **Designated Storage**: Access tokens are stored exclusively in `localStorage` under `campusvoice_access_token` via `tokenStorage.js`.
+- **Zero Credential Persistence**: Plaintext passwords, password hashes, and user claim objects are never stored in browser storage.
+- **Clean Session Termination**: Logout immediately purges the storage token (`removeStoredToken()`) and clears all in-memory React auth states (`user`, `token`, `sessionExpired`).
+- **Graceful Error Recovery**: `getStoredToken()` and `setStoredToken()` gracefully catch `localStorage` quota and access-block exceptions without throwing uncaught errors.
+
+### 2. Centralized 401 Session Expiration & Throttling
+- **Automatic Invalidation**: When any authenticated API request receives an `HTTP 401 Unauthorized` response, `apiClient.js` purges the invalid token and notifies registered auth context listeners.
+- **Alert Storm Mitigation**: Notification broadcasts are throttled using a 400ms cooldown flag (`isHandlingUnauthorized`). Multiple concurrent failing requests trigger exactly one user notification rather than multiple stacking alert banners.
+- **Login Endpoint Exemption**: The `/api/v1/auth/login` request dispatches with `skipAuthHandler: true`. Invalid credentials throw standard form-level validation errors without triggering session-expiration banners.
+- **No Infinite Retries**: The API client strictly avoids automatic retries on 401, preventing infinite request loops against unauthorized endpoints.
+
+### 3. Sensitive Data Privacy & Export Safety
+- **No Token Rendering**: Access tokens are never passed to presentation components, rendered in DOM nodes, or written into user-facing alerts.
+- **Sanitized Errors**: `ApiError` instances extract only safe server `detail` strings, preventing internal server stack traces or header data from appearing in the UI.
+- **Export Scrubbing**: Feedback export transformations (`exportFeedback.js`) only extract defined table columns (`EXPORT_HEADERS`), ensuring tokens, internal database IDs, or credentials never appear in exported CSV or XLSX files.
+
+### 4. Security Considerations & Browser Storage
+- **Storage Scope**: `localStorage` is accessible to scripts within the same origin. Cross-Site Scripting (XSS) risks are mitigated through React's native JSX escaping, rigorous Pydantic input validation on the backend, and short-lived access tokens.
+- **Credentials Policy**: No credentials or environment secrets are committed to version control.
+
+### 5. Verified Test Suite
+- Total Test Files: **16 passed** (including `securitySession.test.js`)
+- Total Passing Tests: **108 passed** (0 failures)
+- Production Build: **168.29 kB** initial JS, **22.31 kB** initial CSS (zero bundle inflation).
+

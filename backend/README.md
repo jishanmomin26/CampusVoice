@@ -721,5 +721,48 @@ Updates user attributes (role, active status, or password).
   * `HTTP 400 Bad Request`: When an admin attempts to set `is_active: false` on their own ID.
   * `HTTP 409 Conflict`: When attempting to deactivate or demote the last active admin account in the database.
 
+---
 
+## 11. Security Architecture & Hardening (Step 9.17)
 
+Step 9.17 introduced comprehensive security hardening across the CampusVoice authentication, authorization, and network communication layers.
+
+### 1. JWT Authentication & Token Security
+- **Algorithm Verification**: Tokens are signed and decoded using `HS256`. Decoding strictly enforces `algorithms=["HS256"]` with required claims `["sub", "iat", "exp"]`. Forged algorithms (`none`, `HS384`, `RS256`) are rejected with HTTP 401.
+- **Payload Privacy & Sanitization**: `create_access_token` automatically strips sensitive keys (`password`, `password_hash`, `feedback_text`) from claims, keeping token payloads minimal (`sub`, `username`, `role`).
+- **Real-Time Database Verification**: The `get_current_user` dependency resolves the subject (`sub`) against PostgreSQL on every request. If a user is deactivated or demoted in the database, subsequent requests are rejected immediately even if their access token has not yet expired.
+
+### 2. Password Security & Bcrypt Hashing
+- **Salted Bcrypt Hashes**: All passwords are encrypted with bcrypt (12 rounds of salting). Passwords and password hashes are strictly excluded from all API response schemas, error messages, debug logs, and token claims.
+- **Uniform Length Constraints**: A strict minimum length of 8 characters and a maximum of 72 bytes (bcrypt input limit) are enforced identically across user creation, password updates, admin seeding (`scripts/seed_admin.py`), and low-level cryptographic utilities.
+- **Safe Hash Verification**: `verify_password` wraps bcrypt operations in defensive exception boundaries, returning `False` on malformed hashes without crashing or revealing stack traces.
+
+### 3. Login Endpoint Hardening & Timing Protection
+- **Neutralizing Username Enumeration**: To prevent timing analysis attacks where response latency could reveal whether a username exists, the login handler runs `verify_password(candidate, DUMMY_BCRYPT_HASH)` when a user is not found.
+- **Generic Authentication Responses**: Non-existent users, incorrect passwords, and inactive user accounts return the exact same generic error: `HTTP 401 Unauthorized` with detail `"Invalid username or password."`. Account status or existence is never leaked.
+
+### 4. Authoritative Role-Based Access Control (RBAC)
+- **Protected Administrator Endpoints**:
+  - `GET /api/v1/feedback/stats`
+  - `GET /api/v1/feedback/records`
+  - `GET /api/v1/users`
+  - `GET /api/v1/users/{user_id}`
+  - `POST /api/v1/users`
+  - `PATCH /api/v1/users/{user_id}`
+- **Enforcement Rules**:
+  - Unauthenticated requests: `HTTP 401 Unauthorized`
+  - Authenticated student requests: `HTTP 403 Forbidden` (`"Administrative privileges required to access this resource."`)
+  - Inactive accounts: `HTTP 401 Unauthorized` (`"User account is inactive."`)
+- **Safeguards**: Self-deactivation prevention (`HTTP 400 Bad Request`) and last-active-admin demotion/deactivation protection (`HTTP 409 Conflict`) prevent administrator lockout.
+- **Public Student Accessibility**: Feedback submission (`POST /feedback`), analysis (`POST /feedback/analyze`), and persisted analysis (`POST /feedback/analyze-and-save`) remain public without requiring student login.
+
+### 5. Configurable CORS Hardening
+- **Environment Modes**: Supported via `ENVIRONMENT=development|production|testing`.
+- **Allowed Origins**: Configured via `CORS_ALLOWED_ORIGINS` (comma-separated origins).
+- **Development Defaults**: In development, `localhost:5173` and `127.0.0.1:5173` are allowed alongside `FRONTEND_URL`.
+- **Production Restrictions**: In production, explicit origins are required; wildcard `*` origins are strictly stripped when credentials are enabled (`allow_credentials=True`).
+- **Restricted Methods & Headers**: Only necessary HTTP methods (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) and headers (`Content-Type`, `Authorization`, `Accept`, `X-Requested-With`) are permitted.
+
+### 6. Automated Security Regression Suite
+Tested with 33 dedicated security unit & integration tests (`tests/test_security_hardening.py`):
+- All 187 backend tests passing (`.\venv\Scripts\python -m pytest tests/ -v`).

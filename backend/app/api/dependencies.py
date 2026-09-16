@@ -67,12 +67,15 @@ def get_current_user(
 
     try:
         user_id = int(user_id_str)
+        if user_id <= 0:
+            raise ValueError("User ID must be a positive integer.")
     except (ValueError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user identifier in token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
 
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:

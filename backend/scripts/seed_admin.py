@@ -45,6 +45,16 @@ def seed_admin() -> bool:
         )
         return False
 
+    clean_password = password.strip()
+    if len(clean_password) < 8:
+        print("ERROR: ADMIN_PASSWORD must be at least 8 characters long.")
+        return False
+
+    if len(clean_password.encode("utf-8")) > 72:
+        print("ERROR: ADMIN_PASSWORD cannot exceed 72 bytes.")
+        return False
+
+
     db = SessionLocal()
     try:
         # Check if an admin with this username already exists

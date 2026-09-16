@@ -15,21 +15,17 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Configure Cross-Origin Resource Sharing (CORS)
-# Uses FRONTEND_URL from environment settings
-cors_origins = [settings.FRONTEND_URL]
-if "http://localhost:5173" not in cors_origins:
-    cors_origins.append("http://localhost:5173")
-if "http://127.0.0.1:5173" not in cors_origins:
-    cors_origins.append("http://127.0.0.1:5173")
+# Configure Cross-Origin Resource Sharing (CORS) with hardened origins & headers
+cors_origins = settings.get_cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
 )
+
 
 # Root-level health endpoint: GET /health
 app.include_router(health.router, tags=["Health"])

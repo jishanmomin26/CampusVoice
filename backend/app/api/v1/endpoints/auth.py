@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
-from app.core.security import create_access_token, verify_password
+from app.core.security import DUMMY_BCRYPT_HASH, create_access_token, verify_password
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import CurrentUserResponse, LoginRequest, TokenResponse
@@ -33,20 +33,33 @@ def login(
         select(User).where(func.lower(User.username) == login_data.username.lower())
     )
 
-    # Constant-time comparison or generic failure for security
-    if not user or not verify_password(login_data.password, user.password_hash):
+    # Mitigate username enumeration timing attacks:
+    # When user is not found, execute a dummy verify_password against DUMMY_BCRYPT_HASH
+    # so response time is indistinguishable from existing accounts.
+    if not user:
+        verify_password(login_data.password, DUMMY_BCRYPT_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if not verify_password(login_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Inactive users receive the exact same generic authentication failure
+    # to avoid disclosing sensitive account-state information.
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
 
     # Issue JWT access token with user claims
     access_token = create_access_token(

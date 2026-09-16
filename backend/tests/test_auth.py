@@ -310,10 +310,17 @@ class TestJWTValidation:
         """16. Token signed with wrong secret key is rejected with HTTP 401."""
         admin = test_users["admin"]
         fake_token = jwt.encode(
-            {"sub": str(admin.id), "username": admin.username, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-            "completely-wrong-secret-key",
+            {
+                "sub": str(admin.id),
+
+                "username": admin.username,
+                "iat": datetime.now(timezone.utc),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            },
+            "completely-wrong-secret-key-min-32-chars-long!",
             algorithm=settings.JWT_ALGORITHM,
         )
+
         app.dependency_overrides[get_db] = lambda: in_memory_db
         try:
             response = client.get(
