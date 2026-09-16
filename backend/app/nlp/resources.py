@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 import sys
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 import nltk
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ SENTIMENT_NEGATION_WORDS: Set[str] = {
 
 # Cached instances
 _spacy_model = None
+_cached_spacy_models: Dict[str, Any] = {}
 _cached_stopwords: Optional[Set[str]] = None
 
 
@@ -140,9 +141,9 @@ def get_spacy_model(model_name: str = "en_core_web_sm"):
     Raises:
         MissingNLPResourceError: If the requested spaCy model is not installed.
     """
-    global _spacy_model
-    if _spacy_model is not None:
-        return _spacy_model
+    global _spacy_model, _cached_spacy_models
+    if model_name in _cached_spacy_models:
+        return _cached_spacy_models[model_name]
 
     import spacy
 
@@ -155,8 +156,10 @@ def get_spacy_model(model_name: str = "en_core_web_sm"):
 
     try:
         # Load with parser and NER disabled for high-speed preprocessing
-        _spacy_model = spacy.load(model_name, disable=["ner"])
-        return _spacy_model
+        model = spacy.load(model_name, disable=["ner"])
+        _cached_spacy_models[model_name] = model
+        _spacy_model = model
+        return model
     except Exception as exc:
         raise MissingNLPResourceError(
             f"Failed to load spaCy model '{model_name}': {exc}"

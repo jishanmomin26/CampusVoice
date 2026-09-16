@@ -60,21 +60,28 @@ Downloads:
 * `wordnet` & `omw-1.4` (lexical database)
 
 ### Step B: Production Build-Time Resource Installation (Render)
-For production environments (such as Render), the required NLTK `stopwords` resource is deterministically installed during the build phase so no runtime downloads occur during application startup:
+For production environments (such as Render), both NLTK `stopwords` and the spaCy `en_core_web_sm` language model are deterministically installed during the build phase. Runtime resource downloads are intentionally not performed by the application:
 ```bash
+# 1. Install dependencies
+pip install -r backend/requirements.txt
+
+# 2. Install required NLTK resources
 python backend/scripts/install_nltk_resources.py
+
+# 3. Install and verify spaCy model
+python backend/scripts/install_spacy_model.py
 ```
-Or via the automated repository root build script:
+Or simply use the repository root build script:
 ```bash
 ./render-build.sh
 ```
 
-**Render Service Configuration:**
+**Render Web Service Settings:**
 * **Root Directory**: `.`
-* **Build Command**: `pip install -r backend/requirements.txt && python backend/scripts/install_nltk_resources.py` *(or `./render-build.sh`)*
+* **Build Command**: `./render-build.sh` *(or `pip install -r backend/requirements.txt && python backend/scripts/install_nltk_resources.py && python backend/scripts/install_spacy_model.py`)*
 * **Start Command**: `PYTHONPATH=. uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
 
-### Step C: Download spaCy English Model
+### Step C: Download spaCy English Model (Local Development)
 ```powershell
 python -m spacy download en_core_web_sm
 ```
