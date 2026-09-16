@@ -89,6 +89,9 @@ ml/datasets/*.tar.gz
 
 ml/models/*.pkl
 ml/models/*.joblib
+!ml/models/tfidf_vectorizer.joblib
+!ml/models/best_sentiment_model.joblib
+!ml/models/best_category_model.joblib
 ml/models/*.h5
 ml/models/*.keras
 ml/models/*.pt
