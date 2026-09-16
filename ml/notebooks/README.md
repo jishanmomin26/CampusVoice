@@ -1,8 +1,20 @@
-# EDA & Experiment Notebooks
+# CampusVoice — Notebooks Directory
 
-This directory is reserved for Jupyter Notebooks used during exploratory research, experimental model comparisons, and NLP visualization.
+This directory is reserved for exploratory data analysis (EDA), prototype prototyping, and experimental research notebooks.
 
-## Guidelines
-* Name notebooks with clear prefixes (e.g., `01_eda_student_feedback.ipynb`, `02_text_preprocessing_benchmarks.ipynb`).
-* Avoid committing large cell execution outputs with sensitive or high-volume data.
-* Prototyped code should eventually be refactored into production modules in `preprocessing/` or `training/`.
+---
+
+## Current Status
+
+* **Status**: Currently empty / reserved for future research.
+* **Production Implementation**: All production NLP preprocessing, dataset preparation, TF-IDF feature engineering, model training, evaluation, priority scoring, and unified inference pipelines are fully implemented and maintained as modular Python packages in:
+  * `ml/preprocessing/`
+  * `ml/training/`
+  * `ml/evaluation/`
+  * `ml/priority/`
+  * `ml/pipeline/`
+
+## Guidelines for New Notebooks
+* Notebooks added here should focus on exploratory data visualizations, hyperparameter tuning experiments, or new feature investigations.
+* Do not commit large cell outputs containing confidential student feedback text.
+* Production code should be refactored into the structured Python packages rather than called from notebooks in production.

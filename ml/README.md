@@ -2,6 +2,20 @@
 
 This directory contains the machine learning, feature engineering, and dataset transformation pipelines for **CampusVoice: AI-Powered Student Feedback Intelligence System**.
 
+```text
+Step 3: Preprocessing (spaCy lemmatization + NLTK negations)
+   ↓
+Step 4: Dataset + TF-IDF (Fitted 2,720 bi-grams on training split)
+   ↓
+Step 5: Sentiment Classification (Logistic Regression: Macro F1 0.6217)
+   ↓
+Step 6: Category Classification (Logistic Regression: Macro F1 0.6628)
+   ↓
+Step 7: Unified Intelligence Pipeline (In-memory cached singleton)
+   ↓
+Step 8: Priority Scoring (Deterministic, explainable rule engine)
+```
+
 ---
 
 ## 1. Dataset Overview
@@ -339,7 +353,7 @@ python ml/training/train_and_evaluate.py
 pytest ml/tests/ -v
 ```
 
-### 4. Run Backend Regression Tests
+### 4. Run Backend Regression Tests (212 tests)
 ```powershell
 pytest backend/tests/ -v
 ```
@@ -455,10 +469,10 @@ pytest ml/tests/test_feedback_intelligence.py -v
 # 3. Run Step 8.1 Priority Scoring Test Suite (21 conditions)
 pytest ml/tests/test_priority_scoring.py -v
 
-# 4. Run Complete ML Test Suite (80 tests)
+# 4. Run Complete ML Test Suite (96 tests)
 pytest ml/tests/ -v
 
-# 5. Run Backend Regression Tests (15 tests)
+# 5. Run Backend Regression Tests (212 tests)
 pytest backend/tests/ -v
 ```
 
@@ -659,7 +673,7 @@ pytest ml/tests/test_priority_scoring.py -v
 # 4. Run Complete ML Suite (96 tests)
 pytest ml/tests/ -v
 
-# 5. Run Backend Regression Tests (15 tests)
+# 5. Run Backend Regression Tests (212 tests)
 pytest backend/tests/ -v
 ```
 
