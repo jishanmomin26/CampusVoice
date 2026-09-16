@@ -50,7 +50,7 @@ pip install -r requirements.txt
 
 The NLP pipeline requires specific NLTK corpora and the spaCy English language model. These are downloaded via controlled, explicit setup commands rather than network downloads during server startup:
 
-### Step A: Download NLTK Resources
+### Step A: Download NLTK Resources (Development)
 ```powershell
 python -m app.nlp.resources --download
 ```
@@ -59,7 +59,22 @@ Downloads:
 * `stopwords` (stopword lists)
 * `wordnet` & `omw-1.4` (lexical database)
 
-### Step B: Download spaCy English Model
+### Step B: Production Build-Time Resource Installation (Render)
+For production environments (such as Render), the required NLTK `stopwords` resource is deterministically installed during the build phase so no runtime downloads occur during application startup:
+```bash
+python backend/scripts/install_nltk_resources.py
+```
+Or via the automated repository root build script:
+```bash
+./render-build.sh
+```
+
+**Render Service Configuration:**
+* **Root Directory**: `.`
+* **Build Command**: `pip install -r backend/requirements.txt && python backend/scripts/install_nltk_resources.py` *(or `./render-build.sh`)*
+* **Start Command**: `PYTHONPATH=. uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
+
+### Step C: Download spaCy English Model
 ```powershell
 python -m spacy download en_core_web_sm
 ```

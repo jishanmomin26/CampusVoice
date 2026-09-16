@@ -104,3 +104,7 @@ ml/models/*.onnx
 # Jupyter Notebook Checkpoints
 .ipynb_checkpoints/
 */.ipynb_checkpoints/*
+
+# NLTK Downloaded Corpora & Build Artifacts
+nltk_data/
+backend/nltk_data/

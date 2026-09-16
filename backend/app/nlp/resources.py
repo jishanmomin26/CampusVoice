@@ -1,11 +1,22 @@
 """NLP Resource Management for NLTK and spaCy."""
 
 import logging
+from pathlib import Path
 import sys
 from typing import Dict, Optional, Set
 import nltk
 
 logger = logging.getLogger(__name__)
+
+# Register project-level and environment nltk_data search paths if present
+_CURRENT_DIR = Path(__file__).resolve().parent
+_BACKEND_DIR = _CURRENT_DIR.parent.parent
+_REPO_ROOT = _BACKEND_DIR.parent
+
+for _search_path in (_REPO_ROOT / "nltk_data", _BACKEND_DIR / "nltk_data", Path(sys.prefix) / "nltk_data"):
+    _str_path = str(_search_path)
+    if _search_path.is_dir() and _str_path not in nltk.data.path:
+        nltk.data.path.insert(0, _str_path)
 
 # Required NLTK corpora and tokenizers
 REQUIRED_NLTK_RESOURCES = {
