@@ -42,6 +42,30 @@ class LoginRequest(BaseModel):
         return v
 
 
+class GoogleLoginRequest(BaseModel):
+    """Schema for Google Sign-In credential authentication request."""
+
+    credential: str = Field(
+        ...,
+        min_length=1,
+        description="Google ID Token issued by Google Identity Services",
+        examples=["eyJhbGciOiJSUzI1NiIs..."],
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("credential")
+    @classmethod
+    def validate_credential(cls, v: str) -> str:
+        """Ensure credential is non-empty and stripped of excess whitespace."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Credential cannot be empty or invalid.")
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Credential cannot be empty or whitespace-only.")
+        return stripped
+
+
 class TokenResponse(BaseModel):
     """Schema for successful authentication token response."""
 

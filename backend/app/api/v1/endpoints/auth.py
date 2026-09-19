@@ -9,7 +9,16 @@ from app.api.dependencies import get_current_user
 from app.core.security import DUMMY_BCRYPT_HASH, create_access_token, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import CurrentUserResponse, LoginRequest, TokenResponse
+from app.schemas.auth import (
+    CurrentUserResponse,
+    GoogleLoginRequest,
+    LoginRequest,
+    TokenResponse,
+)
+from app.services.google_auth_service import (
+    authenticate_or_provision_google_user,
+    verify_google_id_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +71,41 @@ def login(
 
 
     # Issue JWT access token with user claims
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role,
+        }
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        role=user.role,
+        username=user.username,
+    )
+
+
+@router.post(
+    "/google",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Google Sign-In Authentication",
+    description="Verifies a Google ID token and issues a CampusVoice JWT bearer access token.",
+)
+def google_login(
+    login_data: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Authenticate user with verified Google ID token and issue JWT access token."""
+    # 1. Cryptographically verify Google ID token and extract verified identity claims
+    google_claims = verify_google_id_token(login_data.credential)
+
+    # 2. Find existing account or provision student user
+    user = authenticate_or_provision_google_user(db, google_claims)
+
+    # 3. Issue standard CampusVoice JWT access token
     access_token = create_access_token(
         data={
             "sub": str(user.id),

@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str | None = None
 
+    # Google OAuth / OpenID Connect Settings (Step 9.19.1)
+    GOOGLE_CLIENT_ID: str | None = None
+
     def get_cors_origins(self) -> list[str]:
         """Resolves the allowed CORS origins based on environment settings.
         

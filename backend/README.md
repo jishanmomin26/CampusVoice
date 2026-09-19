@@ -99,6 +99,7 @@ cp .env.example .env
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | int | `60` | JWT access token expiration in minutes. |
 | `ADMIN_USERNAME` | string | `admin` | Initial admin username for seeding. |
 | `ADMIN_PASSWORD` | string | `None` | Initial admin password for seeding. |
+| `GOOGLE_CLIENT_ID` | string | `None` | Google OAuth 2.0 Client ID for OpenID Connect token verification. |
 
 ### Production Configuration Hardening (Step 9.18.1)
 When `ENVIRONMENT=production`, strict validation is enforced at application startup:
@@ -117,6 +118,7 @@ Database schemas are managed version-by-version using Alembic migrations in `bac
 1. `001_create_feedback`: Creates the `feedback` table for raw submissions (`id`, `department`, `semester`, `feedback_text`, `created_at`, `updated_at`).
 2. `002_add_analysis_fields`: Extends `feedback` table with ML analysis fields (`clean_text`, `sentiment_label`, `sentiment_score`, `sentiment_confidence`, `category_label`, `category_confidence`, `priority_score`, `priority_level`, `priority_reason`) and makes department/semester optional.
 3. `003_create_users`: Creates the `users` table for JWT authentication and RBAC (`id`, `username`, `password_hash`, `role`, `is_active`, `created_at`, `updated_at`).
+4. `004_add_google_identity_to_users`: Adds nullable `google_sub` column with a unique index to `users` table for Google OAuth mapping.
 
 ### Migration Commands:
 ```powershell
@@ -171,7 +173,11 @@ Interactive OpenAPI documentation is available at:
 ### Authentication & RBAC
 * `POST /api/v1/auth/login`: Authenticates username and password; returns JWT bearer token.
   * *Request*: `{ "username": "admin", "password": "..." }`
-  * *Response*: `{ "access_token": "...", "token_type": "bearer", "user": { "id": 1, "username": "admin", "role": "admin" } }`
+  * *Response*: `{ "access_token": "...", "token_type": "bearer", "role": "admin", "username": "admin" }`
+* `POST /api/v1/auth/google`: Authenticates verified Google ID token and issues standard CampusVoice JWT bearer token.
+  * *Request*: `{ "credential": "<Google ID token>" }`
+  * *Response*: `{ "access_token": "...", "token_type": "bearer", "role": "student", "username": "..." }`
+  * *Security*: Cryptographically verified against Google certificates; enforces `student` role only; creates users with salted bcrypt-hashed random passwords; never returns raw Google ID token.
 * `GET /api/v1/auth/me` *(Authenticated)*:
   * Validates Bearer token and returns current authenticated user profile.
 
