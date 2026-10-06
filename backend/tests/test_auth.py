@@ -549,7 +549,7 @@ class TestRegressionAndIntegrity:
         assert queried_fb.department == "Physics"
 
     def test_condition_30_migration_head_is_003(self):
-        """30. Alembic migration history maintains 003_create_users lineage."""
+        """30. Alembic migration history shows 003_create_users as head revision."""
         from alembic.config import Config
         from alembic.script import ScriptDirectory
 
@@ -559,6 +559,4 @@ class TestRegressionAndIntegrity:
         heads = script.get_heads()
 
         assert len(heads) == 1
-        assert heads[0] in ("003_create_users", "004_add_google_identity_to_users")
-        rev_003 = script.get_revision("003_create_users")
-        assert rev_003 is not None
+        assert heads[0] == "003_create_users"

@@ -1,7 +1,6 @@
 """User SQLAlchemy 2.x Model (Step 9.12)."""
 
 from datetime import datetime
-from typing import Optional
 from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,13 +43,6 @@ class User(Base):
         default=True,
         nullable=False,
         doc="Whether the account is active and allowed to authenticate",
-    )
-    google_sub: Mapped[Optional[str]] = mapped_column(
-        String(255),
-        unique=True,
-        index=True,
-        nullable=True,
-        doc="Google OpenID Connect stable subject identifier (sub)",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
